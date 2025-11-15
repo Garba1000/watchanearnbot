@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <title>Watch & Earn</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+    .container { margin-top: 30px; padding: 20px; }
+    h1 { color: #222; }
+    .button {
+      display: block;
+      margin: 10px auto;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      width: 220px;
+      background: #007bff;
+      color: white;
+    }
+    .button:disabled { background: #aaa; cursor: not-allowed; }
+    #taskSection { margin-top: 20px; padding: 10px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎥 Watch & Earn</h1>
+    <p>💰 Balance: $<span id="balance">0.00</span></p>
+    <p>👥 Referrals: <span id="referrals">0</span></p>
+
+    <button class="button" id="referralBtn">🔗 Copy Referral Link</button>
+    <button class="button" id="watchBtn">🎥 Watch Videos</button>
+    <button class="button" id="taskBtn">✅ Task</button>
+    <button class="button" id="withdrawBtn">💵 Withdraw</button>
+
+    <div id="taskSection">
+      <h3>Complete Task</h3>
+      <adsgram-task id="currentTask" data-block-id="task-14240" class="task"></adsgram-task>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // --- LocalStorage keys ---
+    const balanceKey = 'user_balance';
+    const refsKey = 'user_refs';
+
+    // Initialize balance & referrals
+    let balance = parseFloat(localStorage.getItem(balanceKey)) || 0.06; // welcome bonus
+    let referrals = parseInt(localStorage.getItem(refsKey)) || 0;
+
+    function updateUI() {
+      document.getElementById("balance").textContent = balance.toFixed(2);
+      document.getElementById("referrals").textContent = referrals;
+    }
+    updateUI();
+
+    // Copy referral link
+    document.getElementById("referralBtn").addEventListener("click", () => {
+      const referralLink = `https://t.me/Watchvideosebot?start=${tg.initDataUnsafe.user.id}`;
+      navigator.clipboard.writeText(referralLink);
+      alert("Referral link copied!");
+    });
+
+    // --- Reward Ad ---
+    const RewardAd = window.Adsgram.init({ blockId: "14239" });
+
+    function addReward(amount) {
+      balance += amount;
+      localStorage.setItem(balanceKey, balance.toFixed(2));
+      updateUI();
+    }
+
+    // Show reward ad on page load
+    RewardAd.show().then((res) => {
+      if (res.done) addReward(0.02);
+    }).catch(console.log);
+
+    // Show reward ad when clicking Watch Videos
+    document.getElementById("watchBtn").addEventListener("click", () => {
+      RewardAd.show().then(res => { if (res.done) addReward(0.02); })
+        .catch(console.log);
+    });
+
+    // --- Task System ---
+    const taskBtn = document.getElementById("taskBtn");
+    const taskSection = document.getElementById("taskSection");
+
+    const taskQueue = ["task-14240", "task-14875", "task-14874"];
+    let currentTaskIndex = 0;
+
+    taskBtn.addEventListener("click", () => {
+      taskSection.style.display = "block";
+      loadTask(taskQueue[currentTaskIndex]);
+    });
+
+    function loadTask(taskId) {
+      const newTask = document.createElement("adsgram-task");
+      newTask.className = "task";
+      newTask.setAttribute("data-block-id", taskId);
+      newTask.id = "currentTask";
+
+      const oldTask = document.getElementById("currentTask");
+      oldTask.replaceWith(newTask);
+
+      // Add reward listener
+      newTask.addEventListener("reward", () => {
+        addReward(0.02); // reward per task
+        alert(`✅ Task ${currentTaskIndex + 1} completed! $0.02 added.`);
+
+        if (currentTaskIndex < taskQueue.length - 1) {
+          currentTaskIndex++;
+        } else {
+          // Completed all tasks
+          addReward(0.06); // bonus reward
+          alert("🎉 All 3 tasks completed! Total $0.12 added.");
+          currentTaskIndex = 0; // reset to first task
+        }
+
+        // Load the next task automatically
+        loadTask(taskQueue[currentTaskIndex]);
+      });
+    }
+
+    // --- Withdraw ---
+    document.getElementById("withdrawBtn").addEventListener("click", () => {
+      if (balance < 5) {
+        alert("❌ You need at least $5 to withdraw. Earn more!");
+        return;
+      }
+      tg.sendData(JSON.stringify({ action: "withdraw", amount: balance }));
+      alert("✅ Withdraw request sent to admin.");
+      balance = 0;
+      localStorage.setItem(balanceKey, balance.toFixed(2));
+      updateUI();
+    });
+  </script>
+</body>
+</html>
