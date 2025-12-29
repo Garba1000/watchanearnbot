@@ -38,12 +38,11 @@
       top: 0; left: 0;
       width: 100%; height: 100%;
       background: rgba(0,0,0,0.95);
-      display: flex;
+      display: none;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       z-index: 9999;
-      display: none;
       text-align: center;
       padding: 20px;
     }
@@ -72,6 +71,7 @@
     <a href="https://t.me/Konnetearnchannel" target="_blank" onclick="joinChannelClicked()">👉 Join Channel</a>
   </div>
 
+  <!-- MAIN PAGE -->
   <div class="container" id="mainContainer">
     <h1>🎥 Watch & Earn</h1>
     <p>💰 Balance: $<span id="balance">0.00</span></p>
@@ -92,18 +92,18 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-// --- LocalStorage keys ---
+// Storage keys
 const balanceKey = 'user_balance';
 const refsKey = 'user_refs';
 const joinKey = 'joined_channel';
 
-// Initialize balance & referrals
-let balance = parseFloat(localStorage.getItem(balanceKey)) || 0.06; // welcome bonus
+// Values
+let balance = parseFloat(localStorage.getItem(balanceKey)) || 0.06;
 let referrals = parseInt(localStorage.getItem(refsKey)) || 0;
 
-// UI update
+// Update UI
 function updateUI() {
-  document.getElementById("balance").textContent = balance.toFixed(3); // show 3 decimals
+  document.getElementById("balance").textContent = balance.toFixed(3);
   document.getElementById("referrals").textContent = referrals;
 }
 updateUI();
@@ -115,7 +115,7 @@ document.getElementById("referralBtn").addEventListener("click", () => {
   alert("Referral link copied!");
 });
 
-// --- Reward Ad ---
+// AdsGram Reward Ad
 const RewardAd = window.Adsgram.init({ blockId: "17634" });
 
 function addReward(amount) {
@@ -124,36 +124,40 @@ function addReward(amount) {
   updateUI();
 }
 
-// PRELOAD AD → THEN SHOW JOIN POPUP
+// --- FIXED LOGIC ---
+// PRELOAD ADSGRAM → ALWAYS SHOW POPUP FIRST
 RewardAd.show().finally(() => {
+  // If user never joined → show popup ONLY
   if (!localStorage.getItem(joinKey)) {
     document.getElementById("joinPopup").style.display = "flex";
   } else {
+    // If joined earlier → open main page
     document.getElementById("mainContainer").style.display = "block";
   }
 });
 
-// --- On Join Click ---
+// JOIN BUTTON CLICK
 function joinChannelClicked() {
   if (!localStorage.getItem(joinKey)) {
-    balance += 0.001; // reward $0.001
+    balance += 0.001; // Reward for joining
     localStorage.setItem(balanceKey, balance.toFixed(3));
     localStorage.setItem(joinKey, "yes");
     alert("🎉 Thanks for joining! +$0.001 added.");
     updateUI();
   }
 
+  // Hide popup & show main index
   document.getElementById("joinPopup").style.display = "none";
   document.getElementById("mainContainer").style.display = "block";
 }
 
-// Watch Video Reward
+// Watch video reward
 document.getElementById("watchBtn").addEventListener("click", () => {
   RewardAd.show().then(res => { if (res.done) addReward(0.02); })
   .catch(console.log);
 });
 
-// --- Task System ---
+// Tasks
 const taskBtn = document.getElementById("taskBtn");
 const taskSection = document.getElementById("taskSection");
 
@@ -167,41 +171,39 @@ taskBtn.addEventListener("click", () => {
 
 function loadTask(taskId) {
   const newTask = document.createElement("adsgram-task");
-  newTask.className = "task";
   newTask.setAttribute("data-block-id", taskId);
   newTask.id = "currentTask";
+  newTask.className = "task";
 
   const oldTask = document.getElementById("currentTask");
   oldTask.replaceWith(newTask);
 
   newTask.addEventListener("reward", () => {
     addReward(0.02);
-    alert(`✅ Task ${currentTaskIndex + 1} completed! $0.02 added.`);
+    alert(`✅ Task ${currentTaskIndex + 1} completed!`);
 
     if (currentTaskIndex < taskQueue.length - 1) {
       currentTaskIndex++;
     } else {
       addReward(0.06);
-      alert("🎉 All 3 tasks completed! Total $0.12 added.");
+      alert("🎉 All tasks completed!");
       currentTaskIndex = 0;
     }
     loadTask(taskQueue[currentTaskIndex]);
   });
 }
 
-// --- Withdraw ---
+// Withdraw
 document.getElementById("withdrawBtn").addEventListener("click", () => {
-  if (balance < 5) {
-    alert("❌ You need at least $5 to withdraw. Earn more!");
-    return;
-  }
+  if (balance < 5) return alert("❌ Minimum withdrawal $5!");
+
   tg.sendData(JSON.stringify({ action: "withdraw", amount: balance }));
-  alert("✅ Withdraw request sent to admin.");
+  alert("✅ Request sent!");
   balance = 0;
   localStorage.setItem(balanceKey, balance.toFixed(3));
   updateUI();
 });
-
 </script>
 </body>
 </html>
+
