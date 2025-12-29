@@ -69,7 +69,7 @@
   <!-- JOIN CHANNEL POPUP -->
   <div id="joinPopup">
     <h2>🚫 Join our Telegram channel to continue</h2>
-    <a href="https://otieu.com/4/10388112" target="_blank" onclick="joinChannelClicked()">👉 Join Channel</a>
+    <a href="https://t.me/Konnetearnchannel" target="_blank" onclick="joinChannelClicked()">👉 Join Channel</a>
   </div>
 
   <div class="container" id="mainContainer">
@@ -146,10 +146,14 @@ RewardAd.show().then((res) => {
 // --- On Join Click ---
 function joinChannelClicked() {
   if (!localStorage.getItem(joinKey)) {
-    balance += 0.01; // reward = 1 Gold Energy = $0.01
+
+    /* ✅ YOUR ONLY REQUEST:
+       Reward user $0.001 when they click join */
+    balance += 0.001;
+
     localStorage.setItem(balanceKey, balance.toFixed(2));
     localStorage.setItem(joinKey, "yes");
-    alert("🎉 Thanks for joining! +$0.01 added.");
+    alert("🎉 Thanks for joining! +$0.001 added.");
     updateUI();
   }
 
@@ -215,4 +219,3 @@ document.getElementById("withdrawBtn").addEventListener("click", () => {
 </script>
 </body>
 </html>
-
