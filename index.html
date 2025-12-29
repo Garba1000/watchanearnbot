@@ -15,80 +15,95 @@
       margin: 0;
       padding: 0;
       text-align: center;
+      overflow-x: hidden;
     }
 
-    /* MAIN PAGE (HIDDEN UNTIL JOIN) */
+    /* MAIN PAGE — HIDDEN FIRST */
     #mainContainer {
-      margin-top: 30px;
-      padding: 20px;
       display: none;
+      padding: 20px;
+      margin-top: 30px;
       position: relative;
       z-index: 1;
     }
 
-    h1 { color: #222; }
-
     .button {
       display: block;
+      width: 220px;
       margin: 10px auto;
       padding: 12px 20px;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      width: 220px;
       background: #007bff;
       color: white;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
     }
 
-    #taskSection {
-      margin-top: 20px;
-      padding: 10px;
-      display: none;
-    }
-
-    /* POPUP FULL SCREEN */
+    /* TRUE POPUP (LIKE RADIOCASH) */
     #joinPopup {
       position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.95);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 999999999; /* ALWAYS ON TOP */
       display: none;
-      flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 999999;
+      padding: 25px;
+    }
+
+    /* MODAL BOX */
+    #popupBox {
+      background: #ffffff10;
+      padding: 30px 20px;
+      border-radius: 14px;
+      width: 85%;
+      max-width: 380px;
       text-align: center;
-      padding: 20px;
+      backdrop-filter: blur(7px);
+      border: 1px solid rgba(255,255,255,0.15);
     }
 
-    #joinPopup h2 {
+    #popupBox h2 {
       color: white;
-      margin-bottom: 20px;
       font-size: 22px;
+      margin-bottom: 25px;
+      line-height: 1.4;
     }
 
-    #joinPopup a {
-      background: #00e676;
-      color: black;
-      padding: 12px 20px;
-      border-radius: 10px;
-      font-weight: bold;
-      text-decoration: none;
+    #popupButton {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      background: #ff3b30;
+      color: white;
       font-size: 18px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: bold;
     }
   </style>
 </head>
 
 <body>
 
-<!-- FULL SCREEN POPUP (ALWAYS ON TOP) -->
+<!-- RADIOCASH STYLE POPUP -->
 <div id="joinPopup">
-  <h2>🚫 Join our Telegram Channel to Continue</h2>
-  <a href="https://t.me/Konnetearnchannel" target="_blank" onclick="joinChannelClicked()">👉 JOIN NOW</a>
+  <div id="popupBox">
+    <h2>🚫 You must join our channel to continue</h2>
+    <a id="popupButton"
+       href="https://t.me/Konnetearnchannel"
+       target="_blank"
+       onclick="joinChannelClicked()">
+       👉 Join Telegram Channel
+    </a>
+  </div>
 </div>
 
-<!-- MAIN PAGE (HIDDEN FIRST) -->
+<!-- MAIN CONTENT -->
 <div id="mainContainer">
   <h1>🎥 Watch & Earn</h1>
   <p>💰 Balance: $<span id="balance">0.00</span></p>
@@ -99,9 +114,9 @@
   <button class="button" id="taskBtn">✅ Task</button>
   <button class="button" id="withdrawBtn">💵 Withdraw</button>
 
-  <div id="taskSection">
+  <div id="taskSection" style="display:none;">
     <h3>Complete Task</h3>
-    <adsgram-task id="currentTask" data-block-id="task-17635" class="task"></adsgram-task>
+    <adsgram-task id="currentTask" data-block-id="task-17635"></adsgram-task>
   </div>
 </div>
 
@@ -124,14 +139,14 @@ function updateUI() {
 }
 updateUI();
 
-/* REFERRAL */
+/* REFERRAL BUTTON */
 document.getElementById("referralBtn").addEventListener("click", () => {
-  const referralLink = `https://t.me/Watchvideosebot?start=${tg.initDataUnsafe.user.id}`;
-  navigator.clipboard.writeText(referralLink);
+  const link = `https://t.me/Watchvideosebot?start=${tg.initDataUnsafe.user.id}`;
+  navigator.clipboard.writeText(link);
   alert("Referral link copied!");
 });
 
-/* ADSGRAM REWARD AD */
+/* ADSGRAM */
 const RewardAd = window.Adsgram.init({ blockId: "17634" });
 
 function addReward(amount) {
@@ -140,7 +155,7 @@ function addReward(amount) {
   updateUI();
 }
 
-/* PRELOAD AD — THEN SHOW POPUP FIRST */
+/* PRELOAD AD FIRST THEN SHOW POPUP */
 RewardAd.show().finally(() => {
   if (!localStorage.getItem(joinKey)) {
     document.getElementById("joinPopup").style.display = "flex";
@@ -149,16 +164,17 @@ RewardAd.show().finally(() => {
   }
 });
 
-/* JOIN CHANNEL BUTTON CLICK */
+/* JOIN CHANNEL CLICK */
 function joinChannelClicked() {
   if (!localStorage.getItem(joinKey)) {
-    balance += 0.001;
+    balance += 0.001; /* YOUR REWARD */
     localStorage.setItem(balanceKey, balance.toFixed(3));
     localStorage.setItem(joinKey, "yes");
     updateUI();
-    alert("🎉 Thanks for joining! +$0.001 added.");
+    alert("🎉 +$0.001 rewarded!");
   }
 
+  /* REMOVE POPUP WITHOUT REFRESH */
   document.getElementById("joinPopup").style.display = "none";
   document.getElementById("mainContainer").style.display = "block";
 }
@@ -172,33 +188,30 @@ document.getElementById("watchBtn").addEventListener("click", () => {
 
 /* TASK SYSTEM */
 const taskQueue = ["task-17636", "task-17637", "task-17635"];
-let currentTaskIndex = 0;
+let taskIndex = 0;
 
 document.getElementById("taskBtn").addEventListener("click", () => {
   document.getElementById("taskSection").style.display = "block";
-  loadTask(taskQueue[currentTaskIndex]);
+  loadTask(taskQueue[taskIndex]);
 });
 
-function loadTask(taskId) {
+function loadTask(id) {
   const newTask = document.createElement("adsgram-task");
-  newTask.className = "task";
-  newTask.setAttribute("data-block-id", taskId);
+  newTask.setAttribute("data-block-id", id);
   newTask.id = "currentTask";
 
-  const old = document.getElementById("currentTask");
-  old.replaceWith(newTask);
+  document.getElementById("currentTask").replaceWith(newTask);
 
   newTask.addEventListener("reward", () => {
     addReward(0.02);
 
-    if (currentTaskIndex < taskQueue.length - 1) {
-      currentTaskIndex++;
-    } else {
+    if (taskIndex < taskQueue.length - 1) taskIndex++;
+    else {
+      taskIndex = 0;
       addReward(0.06);
-      currentTaskIndex = 0;
     }
 
-    loadTask(taskQueue[currentTaskIndex]);
+    loadTask(taskQueue[taskIndex]);
   });
 }
 
@@ -207,8 +220,7 @@ document.getElementById("withdrawBtn").addEventListener("click", () => {
   if (balance < 5) return alert("❌ Minimum withdraw is $5");
 
   tg.sendData(JSON.stringify({ action: "withdraw", amount: balance }));
-
-  alert("✅ Withdraw request sent.");
+  alert("Withdraw request sent.");
   balance = 0;
   localStorage.setItem(balanceKey, balance.toFixed(3));
   updateUI();
