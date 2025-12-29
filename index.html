@@ -32,18 +32,17 @@
     .button:disabled { background: #aaa; cursor: not-allowed; }
     #taskSection { margin-top: 20px; padding: 10px; display: none; }
 
-    /* --- POPUP STYLE --- */
+    /* POPUP */
     #joinPopup {
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
       background: rgba(0,0,0,0.95);
-      display: flex;
+      display: none;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       z-index: 9999;
-      display: none;
       text-align: center;
       padding: 20px;
     }
@@ -72,7 +71,7 @@
     <a href="https://t.me/Konnetearnchannel" target="_blank" onclick="joinChannelClicked()">👉 Join Channel</a>
   </div>
 
-  <div class="container" id="mainContainer">
+  <div class="container" id="mainContainer" style="display:none;">
     <h1>🎥 Watch & Earn</h1>
     <p>💰 Balance: $<span id="balance">0.00</span></p>
     <p>👥 Referrals: <span id="referrals">0</span></p>
@@ -92,68 +91,66 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-// --- LocalStorage keys ---
+// storage keys
 const balanceKey = 'user_balance';
 const refsKey = 'user_refs';
 const joinKey = 'joined_channel';
 
-// Initialize balance & referrals
-let balance = parseFloat(localStorage.getItem(balanceKey)) || 0.06; // welcome bonus
+// Initialize balance
+let balance = parseFloat(localStorage.getItem(balanceKey)) || 0.06;
 let referrals = parseInt(localStorage.getItem(refsKey)) || 0;
 
-// UI update
 function updateUI() {
-  document.getElementById("balance").textContent = balance.toFixed(2);
+  document.getElementById("balance").textContent = balance.toFixed(3);
   document.getElementById("referrals").textContent = referrals;
 }
 updateUI();
 
-// Copy referral link
+// Referral link
 document.getElementById("referralBtn").addEventListener("click", () => {
-  const referralLink = `https://t.me/Watchvideosebot?start=${tg.initDataUnsafe.user.id}`;
-  navigator.clipboard.writeText(referralLink);
+  const link = `https://t.me/Watchvideosebot?start=${tg.initDataUnsafe.user.id}`;
+  navigator.clipboard.writeText(link);
   alert("Referral link copied!");
 });
 
-// --- Reward Ad ---
+// AdsGram reward
 const RewardAd = window.Adsgram.init({ blockId: "17634" });
 
 function addReward(amount) {
   balance += amount;
-  localStorage.setItem(balanceKey, balance.toFixed(2));
+  localStorage.setItem(balanceKey, balance.toFixed(3));
   updateUI();
 }
 
-// PRELOAD AD → THEN SHOW JOIN POPUP
+// PRELOAD → THEN FORCE POPUP
 RewardAd.show().then((res) => {
   if (res.done) addReward(0.02);
 
-  // Show popup ONLY if not joined before
-  if (!localStorage.getItem(joinKey)) {
-    document.getElementById("joinPopup").style.display = "flex";
-  } else {
-    document.getElementById("mainContainer").style.display = "block";
-  }
+  setTimeout(() => {
+    if (!localStorage.getItem(joinKey)) {
+      document.getElementById("joinPopup").style.display = "flex";
+      document.getElementById("mainContainer").style.display = "none";
+    } else {
+      document.getElementById("mainContainer").style.display = "block";
+    }
+  }, 200);
 
 }).catch(() => {
   if (!localStorage.getItem(joinKey)) {
     document.getElementById("joinPopup").style.display = "flex";
+    document.getElementById("mainContainer").style.display = "none";
   } else {
     document.getElementById("mainContainer").style.display = "block";
   }
 });
 
-// --- On Join Click ---
+// JOIN BUTTON CLICK
 function joinChannelClicked() {
   if (!localStorage.getItem(joinKey)) {
-
-    /* ✅ YOUR ONLY REQUEST:
-       Reward user $0.001 when they click join */
-    balance += 0.001;
-
-    localStorage.setItem(balanceKey, balance.toFixed(2));
+    balance += 0.001;  
+    localStorage.setItem(balanceKey, balance.toFixed(3));
     localStorage.setItem(joinKey, "yes");
-    alert("🎉 Thanks for joining! +$0.001 added.");
+    alert("🎉 +$0.001 rewarded for joining!");
     updateUI();
   }
 
@@ -161,13 +158,13 @@ function joinChannelClicked() {
   document.getElementById("mainContainer").style.display = "block";
 }
 
-// Watch Video Reward
+// Watch reward
 document.getElementById("watchBtn").addEventListener("click", () => {
   RewardAd.show().then(res => { if (res.done) addReward(0.02); })
   .catch(console.log);
 });
 
-// --- Task System ---
+// Tasks
 const taskBtn = document.getElementById("taskBtn");
 const taskSection = document.getElementById("taskSection");
 
@@ -190,32 +187,29 @@ function loadTask(taskId) {
 
   newTask.addEventListener("reward", () => {
     addReward(0.02);
-    alert(`✅ Task ${currentTaskIndex + 1} completed! $0.02 added.`);
+    alert(`✅ Task ${currentTaskIndex + 1} complete! +$0.02`);
 
     if (currentTaskIndex < taskQueue.length - 1) {
       currentTaskIndex++;
     } else {
       addReward(0.06);
-      alert("🎉 All 3 tasks completed! Total $0.12 added.");
+      alert("🎉 All 3 tasks done! +$0.12 total");
       currentTaskIndex = 0;
     }
     loadTask(taskQueue[currentTaskIndex]);
   });
 }
 
-// --- Withdraw ---
+// Withdraw
 document.getElementById("withdrawBtn").addEventListener("click", () => {
-  if (balance < 5) {
-    alert("❌ You need at least $5 to withdraw. Earn more!");
-    return;
-  }
+  if (balance < 5) return alert("❌ Min withdrawal is $5");
+
   tg.sendData(JSON.stringify({ action: "withdraw", amount: balance }));
-  alert("✅ Withdraw request sent to admin.");
+  alert("Withdraw request sent.");
   balance = 0;
-  localStorage.setItem(balanceKey, balance.toFixed(2));
+  localStorage.setItem(balanceKey, balance.toFixed(3));
   updateUI();
 });
-
 </script>
 </body>
 </html>
