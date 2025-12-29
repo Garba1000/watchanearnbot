@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
   <title>Watch & Earn</title>
+
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
@@ -15,8 +16,18 @@
       padding: 0;
       text-align: center;
     }
-    .container { margin-top: 30px; padding: 20px; display:none; }
+
+    /* MAIN PAGE (HIDDEN UNTIL JOIN) */
+    #mainContainer {
+      margin-top: 30px;
+      padding: 20px;
+      display: none;
+      position: relative;
+      z-index: 1;
+    }
+
     h1 { color: #222; }
+
     .button {
       display: block;
       margin: 10px auto;
@@ -29,10 +40,14 @@
       background: #007bff;
       color: white;
     }
-    .button:disabled { background: #aaa; cursor: not-allowed; }
-    #taskSection { margin-top: 20px; padding: 10px; display: none; }
 
-    /* --- POPUP STYLE --- */
+    #taskSection {
+      margin-top: 20px;
+      padding: 10px;
+      display: none;
+    }
+
+    /* POPUP FULL SCREEN */
     #joinPopup {
       position: fixed;
       top: 0; left: 0;
@@ -42,15 +57,17 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 9999;
+      z-index: 999999;
       text-align: center;
       padding: 20px;
     }
+
     #joinPopup h2 {
       color: white;
       margin-bottom: 20px;
       font-size: 22px;
     }
+
     #joinPopup a {
       background: #00e676;
       color: black;
@@ -65,57 +82,56 @@
 
 <body>
 
-  <!-- JOIN CHANNEL POPUP -->
-  <div id="joinPopup">
-    <h2>🚫 Join our Telegram channel to continue</h2>
-    <a href="https://t.me/Konnetearnchannel" target="_blank" onclick="joinChannelClicked()">👉 Join Channel</a>
+<!-- FULL SCREEN POPUP (ALWAYS ON TOP) -->
+<div id="joinPopup">
+  <h2>🚫 Join our Telegram Channel to Continue</h2>
+  <a href="https://t.me/Konnetearnchannel" target="_blank" onclick="joinChannelClicked()">👉 JOIN NOW</a>
+</div>
+
+<!-- MAIN PAGE (HIDDEN FIRST) -->
+<div id="mainContainer">
+  <h1>🎥 Watch & Earn</h1>
+  <p>💰 Balance: $<span id="balance">0.00</span></p>
+  <p>👥 Referrals: <span id="referrals">0</span></p>
+
+  <button class="button" id="referralBtn">🔗 Copy Referral Link</button>
+  <button class="button" id="watchBtn">🎥 Watch Videos</button>
+  <button class="button" id="taskBtn">✅ Task</button>
+  <button class="button" id="withdrawBtn">💵 Withdraw</button>
+
+  <div id="taskSection">
+    <h3>Complete Task</h3>
+    <adsgram-task id="currentTask" data-block-id="task-17635" class="task"></adsgram-task>
   </div>
-
-  <!-- MAIN PAGE -->
-  <div class="container" id="mainContainer">
-    <h1>🎥 Watch & Earn</h1>
-    <p>💰 Balance: $<span id="balance">0.00</span></p>
-    <p>👥 Referrals: <span id="referrals">0</span></p>
-
-    <button class="button" id="referralBtn">🔗 Copy Referral Link</button>
-    <button class="button" id="watchBtn">🎥 Watch Videos</button>
-    <button class="button" id="taskBtn">✅ Task</button>
-    <button class="button" id="withdrawBtn">💵 Withdraw</button>
-
-    <div id="taskSection">
-      <h3>Complete Task</h3>
-      <adsgram-task id="currentTask" data-block-id="task-17635" class="task"></adsgram-task>
-    </div>
-  </div>
+</div>
 
 <script>
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-// Storage keys
+/* STORAGE KEYS */
 const balanceKey = 'user_balance';
 const refsKey = 'user_refs';
 const joinKey = 'joined_channel';
 
-// Values
+/* INITIAL VALUES */
 let balance = parseFloat(localStorage.getItem(balanceKey)) || 0.06;
 let referrals = parseInt(localStorage.getItem(refsKey)) || 0;
 
-// Update UI
 function updateUI() {
   document.getElementById("balance").textContent = balance.toFixed(3);
   document.getElementById("referrals").textContent = referrals;
 }
 updateUI();
 
-// Copy referral link
+/* REFERRAL */
 document.getElementById("referralBtn").addEventListener("click", () => {
   const referralLink = `https://t.me/Watchvideosebot?start=${tg.initDataUnsafe.user.id}`;
   navigator.clipboard.writeText(referralLink);
   alert("Referral link copied!");
 });
 
-// AdsGram Reward Ad
+/* ADSGRAM REWARD AD */
 const RewardAd = window.Adsgram.init({ blockId: "17634" });
 
 function addReward(amount) {
@@ -124,86 +140,80 @@ function addReward(amount) {
   updateUI();
 }
 
-// --- FIXED LOGIC ---
-// PRELOAD ADSGRAM → ALWAYS SHOW POPUP FIRST
+/* PRELOAD AD — THEN SHOW POPUP FIRST */
 RewardAd.show().finally(() => {
-  // If user never joined → show popup ONLY
   if (!localStorage.getItem(joinKey)) {
     document.getElementById("joinPopup").style.display = "flex";
   } else {
-    // If joined earlier → open main page
     document.getElementById("mainContainer").style.display = "block";
   }
 });
 
-// JOIN BUTTON CLICK
+/* JOIN CHANNEL BUTTON CLICK */
 function joinChannelClicked() {
   if (!localStorage.getItem(joinKey)) {
-    balance += 0.001; // Reward for joining
+    balance += 0.001;
     localStorage.setItem(balanceKey, balance.toFixed(3));
     localStorage.setItem(joinKey, "yes");
-    alert("🎉 Thanks for joining! +$0.001 added.");
     updateUI();
+    alert("🎉 Thanks for joining! +$0.001 added.");
   }
 
-  // Hide popup & show main index
   document.getElementById("joinPopup").style.display = "none";
   document.getElementById("mainContainer").style.display = "block";
 }
 
-// Watch video reward
+/* WATCH VIDEO */
 document.getElementById("watchBtn").addEventListener("click", () => {
-  RewardAd.show().then(res => { if (res.done) addReward(0.02); })
-  .catch(console.log);
+  RewardAd.show().then(res => {
+    if (res.done) addReward(0.02);
+  });
 });
 
-// Tasks
-const taskBtn = document.getElementById("taskBtn");
-const taskSection = document.getElementById("taskSection");
-
+/* TASK SYSTEM */
 const taskQueue = ["task-17636", "task-17637", "task-17635"];
 let currentTaskIndex = 0;
 
-taskBtn.addEventListener("click", () => {
-  taskSection.style.display = "block";
+document.getElementById("taskBtn").addEventListener("click", () => {
+  document.getElementById("taskSection").style.display = "block";
   loadTask(taskQueue[currentTaskIndex]);
 });
 
 function loadTask(taskId) {
   const newTask = document.createElement("adsgram-task");
+  newTask.className = "task";
   newTask.setAttribute("data-block-id", taskId);
   newTask.id = "currentTask";
-  newTask.className = "task";
 
-  const oldTask = document.getElementById("currentTask");
-  oldTask.replaceWith(newTask);
+  const old = document.getElementById("currentTask");
+  old.replaceWith(newTask);
 
   newTask.addEventListener("reward", () => {
     addReward(0.02);
-    alert(`✅ Task ${currentTaskIndex + 1} completed!`);
 
     if (currentTaskIndex < taskQueue.length - 1) {
       currentTaskIndex++;
     } else {
       addReward(0.06);
-      alert("🎉 All tasks completed!");
       currentTaskIndex = 0;
     }
+
     loadTask(taskQueue[currentTaskIndex]);
   });
 }
 
-// Withdraw
+/* WITHDRAW */
 document.getElementById("withdrawBtn").addEventListener("click", () => {
-  if (balance < 5) return alert("❌ Minimum withdrawal $5!");
+  if (balance < 5) return alert("❌ Minimum withdraw is $5");
 
   tg.sendData(JSON.stringify({ action: "withdraw", amount: balance }));
-  alert("✅ Request sent!");
+
+  alert("✅ Withdraw request sent.");
   balance = 0;
   localStorage.setItem(balanceKey, balance.toFixed(3));
   updateUI();
 });
 </script>
+
 </body>
 </html>
-
