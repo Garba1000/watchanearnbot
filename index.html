@@ -18,7 +18,6 @@
       overflow-x: hidden;
     }
 
-    /* MAIN PAGE — HIDDEN FIRST */
     #mainContainer {
       display: none;
       padding: 20px;
@@ -40,7 +39,6 @@
       cursor: pointer;
     }
 
-    /* TRUE POPUP (LIKE RADIOCASH) */
     #joinPopup {
       position: fixed;
       top: 0;
@@ -48,14 +46,13 @@
       width: 100%;
       height: 100%;
       background: rgba(0, 0, 0, 0.9);
-      z-index: 999999999; /* ALWAYS ON TOP */
+      z-index: 999999999;
       display: none;
       justify-content: center;
       align-items: center;
       padding: 25px;
     }
 
-    /* MODAL BOX */
     #popupBox {
       background: #ffffff10;
       padding: 30px 20px;
@@ -90,7 +87,7 @@
 
 <body>
 
-<!-- RADIOCASH STYLE POPUP -->
+<!-- JOIN CHANNEL POPUP -->
 <div id="joinPopup">
   <div id="popupBox">
     <h2>🚫 You must join our channel to continue</h2>
@@ -112,11 +109,17 @@
   <button class="button" id="referralBtn">🔗 Copy Referral Link</button>
   <button class="button" id="watchBtn">🎥 Watch Videos</button>
   <button class="button" id="taskBtn">✅ Task</button>
+  <button class="button" id="leadershipBtn">🏆 Leadership</button>
   <button class="button" id="withdrawBtn">💵 Withdraw</button>
 
   <div id="taskSection" style="display:none;">
     <h3>Complete Task</h3>
     <adsgram-task id="currentTask" data-block-id="task-17635"></adsgram-task>
+  </div>
+
+  <div id="leadershipSection" style="display:none; margin-top:20px;">
+    <h3>🏆 Leadership Board</h3>
+    <ul id="leaderboardList"></ul>
   </div>
 </div>
 
@@ -128,14 +131,23 @@ tg.expand();
 const balanceKey = 'user_balance';
 const refsKey = 'user_refs';
 const joinKey = 'joined_channel';
+const tasksKey = 'tasks_completed';
+const referralsKey = 'referrals_data';
+const leadershipRewardsKey = 'leadership_rewards';
+
+/* ADMIN */
+const ADMIN_ID = 568976475;
 
 /* INITIAL VALUES */
 let balance = parseFloat(localStorage.getItem(balanceKey)) || 0.06;
 let referrals = parseInt(localStorage.getItem(refsKey)) || 0;
+let tasksCompleted = JSON.parse(localStorage.getItem(tasksKey)) || {}; // {task1:true, task2:true, ...}
+let referralsData = JSON.parse(localStorage.getItem(referralsKey)) || {}; // {referrerId: [referredUserIds]}
 
+/* UTILITY */
 function updateUI() {
-  document.getElementById("balance").textContent = balance.toFixed(3);
-  document.getElementById("referrals").textContent = referrals;
+  document.getElementById("balance").textContent = balance.toFixed(2);
+  document.getElementById("referrals").textContent = Object.keys(referralsData).length;
 }
 updateUI();
 
@@ -151,11 +163,11 @@ const RewardAd = window.Adsgram.init({ blockId: "21542" });
 
 function addReward(amount) {
   balance += amount;
-  localStorage.setItem(balanceKey, balance.toFixed(3));
+  localStorage.setItem(balanceKey, balance.toFixed(2));
   updateUI();
 }
 
-/* PRELOAD AD FIRST THEN SHOW POPUP */
+/* PRELOAD AD THEN SHOW POPUP */
 RewardAd.show().finally(() => {
   if (!localStorage.getItem(joinKey)) {
     document.getElementById("joinPopup").style.display = "flex";
@@ -164,17 +176,14 @@ RewardAd.show().finally(() => {
   }
 });
 
-/* JOIN CHANNEL CLICK */
+/* JOIN CHANNEL */
 function joinChannelClicked() {
   if (!localStorage.getItem(joinKey)) {
-    balance += 0.001; /* YOUR REWARD */
-    localStorage.setItem(balanceKey, balance.toFixed(3));
+    addReward(0.001);
     localStorage.setItem(joinKey, "yes");
     updateUI();
     alert("🎉 +$0.001 rewarded!");
   }
-
-  /* REMOVE POPUP WITHOUT REFRESH */
   document.getElementById("joinPopup").style.display = "none";
   document.getElementById("mainContainer").style.display = "block";
 }
@@ -205,26 +214,119 @@ function loadTask(id) {
   newTask.addEventListener("reward", () => {
     addReward(0.02);
 
+    // mark task as done in localStorage
+    tasksCompleted[id] = true;
+    localStorage.setItem(tasksKey, JSON.stringify(tasksCompleted));
+
     if (taskIndex < taskQueue.length - 1) taskIndex++;
     else {
       taskIndex = 0;
       addReward(0.06);
+      alert("🎉 Social task completed successfully!");
+      checkReferralReward(); // check if referrer should get $0.01
     }
 
     loadTask(taskQueue[taskIndex]);
   });
 }
 
+/* REFERRAL REWARD */
+function checkReferralReward() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const referrerId = urlParams.get('start'); // get referrer ID
+  if (!referrerId) return;
+
+  // Only reward if all tasks completed
+  if (Object.keys(tasksCompleted).length >= taskQueue.length) {
+    if (!referralsData[referrerId]) referralsData[referrerId] = [];
+    if (!referralsData[referrerId].includes(tg.initDataUnsafe.user.id)) {
+      referralsData[referrerId].push(tg.initDataUnsafe.user.id);
+      localStorage.setItem(referralsKey, JSON.stringify(referralsData));
+      addReward(0.01); // reward for referrer
+      alert("💰 You earned $0.01 from your referral!");
+    }
+  }
+}
+
 /* WITHDRAW */
 document.getElementById("withdrawBtn").addEventListener("click", () => {
   if (balance < 5) return alert("❌ Minimum withdraw is $5");
 
-  tg.sendData(JSON.stringify({ action: "withdraw", amount: balance }));
-  alert("Withdraw request sent.");
+  // send withdraw to admin
+  tg.sendData(JSON.stringify({
+    action: "forward_to_admin",
+    admin_id: ADMIN_ID,
+    user_id: tg.initDataUnsafe.user.id,
+    amount: balance
+  }));
+
+  // notify user
+  alert("✅ Your withdrawal request has been forwarded to the admin.");
+
   balance = 0;
-  localStorage.setItem(balanceKey, balance.toFixed(3));
+  localStorage.setItem(balanceKey, balance.toFixed(2));
   updateUI();
 });
+
+/* LEADERSHIP BUTTON */
+document.getElementById("leadershipBtn").addEventListener("click", () => {
+  document.getElementById("leadershipSection").style.display = "block";
+  renderLeaderboard();
+});
+
+function renderLeaderboard() {
+  const list = document.getElementById("leaderboardList");
+  list.innerHTML = '';
+
+  const rewardsDate = new Date("2026-03-14T00:00:00");
+  const now = new Date();
+
+  // calculate leaderboard
+  const leaderboard = [];
+  for (let ref in referralsData) {
+    const count = referralsData[ref].length;
+    leaderboard.push({ ref, count });
+  }
+
+  leaderboard.sort((a,b) => b.count - a.count); // highest first
+
+  leaderboard.forEach((entry, idx) => {
+    const li = document.createElement('li');
+    li.textContent = `#${idx+1} User: ${entry.ref} Referrals: ${entry.count}`;
+    list.appendChild(li);
+
+    // auto payout after end date
+    if (now >= rewardsDate) {
+      let reward = 0;
+      if (idx === 0) reward = 60;
+      else if (idx === 1) reward = 15;
+      else if (idx === 2) reward = 10;
+      else if (idx === 3) reward = 5;
+      else if (idx === 4) reward = 3;
+      else if (idx >=5 && idx < 10) reward = 1;
+
+      if (reward > 0 && !JSON.parse(localStorage.getItem(leadershipRewardsKey) || '[]').includes(entry.ref)) {
+        addRewardToUser(entry.ref, reward);
+      }
+    }
+  });
+}
+
+/* CREDIT LEADERSHIP REWARD */
+function addRewardToUser(userId, amount) {
+  // Only credit if this is the current user
+  if (tg.initDataUnsafe.user.id == userId) {
+    addReward(amount);
+    alert(`🏆 Leadership reward $${amount} added to your balance!`);
+  }
+
+  // store paid users
+  let paidUsers = JSON.parse(localStorage.getItem(leadershipRewardsKey) || '[]');
+  if (!paidUsers.includes(userId)) {
+    paidUsers.push(userId);
+    localStorage.setItem(leadershipRewardsKey, JSON.stringify(paidUsers));
+  }
+}
 </script>
 
 </body>
