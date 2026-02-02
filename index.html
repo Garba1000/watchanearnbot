@@ -178,7 +178,7 @@ updateUI();
 
 /* REFERRAL BUTTON */
 document.getElementById("referralBtn").addEventListener("click", () => {
-  const link = `https://t.me/Watchvideosebot?start=${tg.initDataUnsafe.user.id}`;
+  const link = `https://garba1000.github.io/watchanearnbot/?start=${tg.initDataUnsafe.user.id}`;
   navigator.clipboard.writeText(link);
   alert("Referral link copied!");
 });
@@ -253,19 +253,13 @@ function loadTask(id){
 /* CHECK REFERRAL REWARD */
 function checkReferralReward(){
   if(!referrerId) return;
-  // Only reward if user completed all 4 tasks
   if(Object.keys(tasksCompleted).length >= taskQueue.length){
-    addReferralReward(referrerId,tg.initDataUnsafe.user.id);
+    addRewardForReferrer(referrerId);
   }
   updateUI();
 }
 
 /* ADD REFERRAL REWARD */
-function addReferralReward(referrer,userId){
-  // Referrer earns $0.01 only after referral completes all 4 tasks
-  addRewardForReferrer(referrer);
-}
-
 function addRewardForReferrer(referrerId){
   if(tg.initDataUnsafe.user.id == referrerId) return; // don't self-reward
   addReward(0.01);
