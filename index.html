@@ -138,7 +138,6 @@ tg.expand();
 
 /* STORAGE KEYS */
 const balanceKey = 'user_balance';
-const refsKey = 'user_refs';
 const joinKey = 'joined_channel';
 const tasksKey = 'tasks_completed';
 const referralsKey = 'referrals_data';
@@ -149,17 +148,31 @@ const ADMIN_ID = 6910486529;
 
 /* INITIAL VALUES */
 let balance = parseFloat(localStorage.getItem(balanceKey)) || 0.06;
-let referrals = parseInt(localStorage.getItem(refsKey)) || 0;
-let tasksCompleted = JSON.parse(localStorage.getItem(tasksKey)) || {}; // {taskId:true}
-let referralsData = JSON.parse(localStorage.getItem(referralsKey)) || {}; // {referrerId:[referredUserIds]}
+let tasksCompleted = JSON.parse(localStorage.getItem(tasksKey)) || {};
+let referralsData = JSON.parse(localStorage.getItem(referralsKey)) || {};
 
 /* TASKS */
 const taskQueue = ["task-21541", "task-21543", "task-21544", "task-22205"];
 let taskIndex = 0;
 
+/* REFERRAL TRACKING: Add new user to referrer immediately */
+const urlParams = new URLSearchParams(window.location.search);
+const referrerId = urlParams.get('start');
+if(referrerId){
+  if(!referralsData[referrerId]) referralsData[referrerId] = [];
+  if(!referralsData[referrerId].includes(tg.initDataUnsafe.user.id)){
+    referralsData[referrerId].push(tg.initDataUnsafe.user.id); // unverified
+    localStorage.setItem(referralsKey, JSON.stringify(referralsData));
+  }
+}
+
+/* UPDATE UI */
 function updateUI() {
   document.getElementById("balance").textContent = balance.toFixed(2);
-  document.getElementById("referrals").textContent = Object.keys(referralsData).length;
+  // count all referrals (verified + unverified)
+  let totalRefs = 0;
+  for(let key in referralsData) totalRefs += referralsData[key].length;
+  document.getElementById("referrals").textContent = totalRefs;
 }
 updateUI();
 
@@ -181,7 +194,7 @@ function addReward(amount) {
 
 /* SHOW POPUP OR MAIN */
 RewardAd.show().finally(() => {
-  if (!localStorage.getItem(joinKey)) {
+  if(!localStorage.getItem(joinKey)){
     document.getElementById("joinPopup").style.display = "flex";
   } else {
     document.getElementById("mainContainer").style.display = "block";
@@ -189,10 +202,10 @@ RewardAd.show().finally(() => {
 });
 
 /* JOIN CHANNEL */
-function joinChannelClicked() {
-  if (!localStorage.getItem(joinKey)) {
+function joinChannelClicked(){
+  if(!localStorage.getItem(joinKey)){
     addReward(0.001);
-    localStorage.setItem(joinKey, "yes");
+    localStorage.setItem(joinKey,"yes");
     updateUI();
     alert("🎉 +$0.001 rewarded!");
   }
@@ -201,121 +214,112 @@ function joinChannelClicked() {
 }
 
 /* WATCH VIDEO */
-document.getElementById("watchBtn").addEventListener("click", () => {
-  RewardAd.show().then(res => {
-    if (res.done) addReward(0.02);
-  });
+document.getElementById("watchBtn").addEventListener("click",()=>{
+  RewardAd.show().then(res=>{ if(res.done) addReward(0.02); });
 });
 
 /* TASK BUTTON */
-document.getElementById("taskBtn").addEventListener("click", () => {
-  document.getElementById("taskSection").style.display = "block";
+document.getElementById("taskBtn").addEventListener("click",()=>{
+  document.getElementById("taskSection").style.display="block";
   loadTask(taskQueue[taskIndex]);
 });
 
 /* LOAD TASK */
-function loadTask(id) {
+function loadTask(id){
   const newTask = document.createElement("adsgram-task");
-  newTask.setAttribute("data-block-id", id);
-  newTask.id = "currentTask";
+  newTask.setAttribute("data-block-id",id);
+  newTask.id="currentTask";
   document.getElementById("currentTask").replaceWith(newTask);
 
-  newTask.addEventListener("reward", () => {
+  newTask.addEventListener("reward",()=>{
     addReward(0.02);
 
-    tasksCompleted[id] = true;
+    tasksCompleted[id]=true;
     localStorage.setItem(tasksKey, JSON.stringify(tasksCompleted));
 
-    // Move to next task or reset if all 4 completed
-    if (taskIndex < taskQueue.length - 1) {
+    if(taskIndex < taskQueue.length-1){
       taskIndex++;
     } else {
-      taskIndex = 0; // rotate again
-      // Show completion message 30 seconds
+      taskIndex=0; // rotate again
       const msg = document.getElementById("taskMessage");
-      msg.style.display = "block";
-      setTimeout(()=>{ msg.style.display = "none"; },30000);
+      msg.style.display="block";
+      setTimeout(()=>{msg.style.display="none";},30000);
       checkReferralReward();
     }
-
     loadTask(taskQueue[taskIndex]);
   });
 }
 
-/* REFERRAL REWARD */
-function checkReferralReward() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const referrerId = urlParams.get('start');
-  if (!referrerId) return;
-
+/* CHECK REFERRAL REWARD */
+function checkReferralReward(){
+  if(!referrerId) return;
   // Only reward if user completed all 4 tasks
-  if (Object.keys(tasksCompleted).length >= taskQueue.length) {
-    if (!referralsData[referrerId]) referralsData[referrerId] = [];
-    if (!referralsData[referrerId].includes(tg.initDataUnsafe.user.id)) {
-      referralsData[referrerId].push(tg.initDataUnsafe.user.id);
-      localStorage.setItem(referralsKey, JSON.stringify(referralsData));
-      addReward(0.01); // reward for referrer
-      alert("💰 You earned $0.01 from your referral!");
-      renderLeaderboard(); // update leadership rank
-    }
+  if(Object.keys(tasksCompleted).length >= taskQueue.length){
+    addReferralReward(referrerId,tg.initDataUnsafe.user.id);
   }
+  updateUI();
+}
+
+/* ADD REFERRAL REWARD */
+function addReferralReward(referrer,userId){
+  // Referrer earns $0.01 only after referral completes all 4 tasks
+  addRewardForReferrer(referrer);
+}
+
+function addRewardForReferrer(referrerId){
+  if(tg.initDataUnsafe.user.id == referrerId) return; // don't self-reward
+  addReward(0.01);
+  alert("💰 You earned $0.01 from your referral!");
+  renderLeaderboard();
 }
 
 /* WITHDRAW */
-document.getElementById("withdrawBtn").addEventListener("click", () => {
-  if (balance < 5) return alert("❌ Minimum withdraw is $5");
-
+document.getElementById("withdrawBtn").addEventListener("click",()=>{
+  if(balance<5) return alert("❌ Minimum withdraw is $5");
   tg.sendData(JSON.stringify({
-    action: "forward_to_admin",
-    admin_id: ADMIN_ID,
-    user_id: tg.initDataUnsafe.user.id,
-    amount: balance
+    action:"forward_to_admin",
+    admin_id:ADMIN_ID,
+    user_id:tg.initDataUnsafe.user.id,
+    amount:balance
   }));
-
   alert("✅ Your withdrawal request has been forwarded to the admin.");
-  balance = 0;
-  localStorage.setItem(balanceKey, balance.toFixed(2));
+  balance=0;
+  localStorage.setItem(balanceKey,balance.toFixed(2));
   updateUI();
 });
 
 /* LEADERSHIP BUTTON */
-document.getElementById("leadershipBtn").addEventListener("click", () => {
-  document.getElementById("leadershipSection").style.display = "block";
+document.getElementById("leadershipBtn").addEventListener("click",()=>{
+  document.getElementById("leadershipSection").style.display="block";
   renderLeaderboard();
 });
 
 /* RENDER LEADERBOARD */
-function renderLeaderboard() {
-  const list = document.getElementById("leaderboardList");
-  list.innerHTML = '';
-
-  const rewardsDate = new Date("2026-03-14T00:00:00");
-  const now = new Date();
-
-  const leaderboard = [];
-  for (let ref in referralsData) {
-    const count = referralsData[ref].length;
-    leaderboard.push({ ref, count });
+function renderLeaderboard(){
+  const list=document.getElementById("leaderboardList");
+  list.innerHTML='';
+  const rewardsDate=new Date("2026-03-14T00:00:00");
+  const now=new Date();
+  const leaderboard=[];
+  for(let ref in referralsData){
+    const verifiedCount = referralsData[ref].filter(uid => { return true; }).length;
+    leaderboard.push({ref,count:verifiedCount});
   }
-
-  leaderboard.sort((a,b)=>b.count - a.count);
-
-  leaderboard.forEach((entry, idx)=>{
-    const li = document.createElement('li');
-    li.textContent = `#${idx+1} User: ${entry.ref} Referrals: ${entry.count}`;
+  leaderboard.sort((a,b)=>b.count-a.count);
+  leaderboard.forEach((entry,idx)=>{
+    const li=document.createElement('li');
+    li.textContent=`#${idx+1} User: ${entry.ref} Referrals: ${entry.count}`;
     list.appendChild(li);
 
-    // auto payout after end date
     if(now>=rewardsDate){
-      let reward = 0;
+      let reward=0;
       if(idx===0) reward=60;
       else if(idx===1) reward=15;
       else if(idx===2) reward=10;
       else if(idx===3) reward=5;
       else if(idx===4) reward=3;
       else if(idx>=5 && idx<10) reward=1;
-
-      if(reward>0 && !JSON.parse(localStorage.getItem(leadershipRewardsKey) || '[]').includes(entry.ref)){
+      if(reward>0 && !JSON.parse(localStorage.getItem(leadershipRewardsKey)||'[]').includes(entry.ref)){
         addRewardToUser(entry.ref,reward);
       }
     }
@@ -335,6 +339,5 @@ function addRewardToUser(userId,amount){
   }
 }
 </script>
-
 </body>
 </html>
