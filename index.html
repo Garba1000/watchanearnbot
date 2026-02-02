@@ -1,88 +1,95 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-  <title>Watch & Earn</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>Watch & Earn</title>
 
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f9f9f9;
-      margin: 0;
-      padding: 0;
-      text-align: center;
-      overflow-x: hidden;
-    }
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f9f9f9;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    overflow-x: hidden;
+  }
 
-    #mainContainer {
-      display: none;
-      padding: 20px;
-      margin-top: 30px;
-      position: relative;
-      z-index: 1;
-    }
+  #mainContainer {
+    display: none;
+    padding: 20px;
+    margin-top: 30px;
+    position: relative;
+    z-index: 1;
+  }
 
-    .button {
-      display: block;
-      width: 220px;
-      margin: 10px auto;
-      padding: 12px 20px;
-      background: #007bff;
-      color: white;
-      border-radius: 8px;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-    }
+  .button {
+    display: block;
+    width: 220px;
+    margin: 10px auto;
+    padding: 12px 20px;
+    background: #007bff;
+    color: white;
+    border-radius: 8px;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+  }
 
-    #joinPopup {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.9);
-      z-index: 999999999;
-      display: none;
-      justify-content: center;
-      align-items: center;
-      padding: 25px;
-    }
+  #joinPopup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 999999999;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    padding: 25px;
+  }
 
-    #popupBox {
-      background: #ffffff10;
-      padding: 30px 20px;
-      border-radius: 14px;
-      width: 85%;
-      max-width: 380px;
-      text-align: center;
-      backdrop-filter: blur(7px);
-      border: 1px solid rgba(255,255,255,0.15);
-    }
+  #popupBox {
+    background: #ffffff10;
+    padding: 30px 20px;
+    border-radius: 14px;
+    width: 85%;
+    max-width: 380px;
+    text-align: center;
+    backdrop-filter: blur(7px);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
 
-    #popupBox h2 {
-      color: white;
-      font-size: 22px;
-      margin-bottom: 25px;
-      line-height: 1.4;
-    }
+  #popupBox h2 {
+    color: white;
+    font-size: 22px;
+    margin-bottom: 25px;
+    line-height: 1.4;
+  }
 
-    #popupButton {
-      display: block;
-      width: 100%;
-      padding: 14px;
-      background: #ff3b30;
-      color: white;
-      font-size: 18px;
-      border-radius: 10px;
-      text-decoration: none;
-      font-weight: bold;
-    }
-  </style>
+  #popupButton {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    background: #ff3b30;
+    color: white;
+    font-size: 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: bold;
+  }
+
+  #taskMessage {
+    display:none;
+    color: #00ff00;
+    font-weight:bold;
+    margin-top: 10px;
+  }
+</style>
 </head>
 
 <body>
@@ -105,6 +112,7 @@
   <h1>🎥 Watch & Earn</h1>
   <p>💰 Balance: $<span id="balance">0.00</span></p>
   <p>👥 Referrals: <span id="referrals">0</span></p>
+  <p style="color:#888;font-size:14px;">⚠️ You earn reward only after the person you invited completes all 4 tasks.</p>
 
   <button class="button" id="referralBtn">🔗 Copy Referral Link</button>
   <button class="button" id="watchBtn">🎥 Watch Videos</button>
@@ -115,6 +123,7 @@
   <div id="taskSection" style="display:none;">
     <h3>Complete Task</h3>
     <adsgram-task id="currentTask" data-block-id="task-22205"></adsgram-task>
+    <div id="taskMessage">🎉 Social task completed successfully!</div>
   </div>
 
   <div id="leadershipSection" style="display:none; margin-top:20px;">
@@ -141,10 +150,13 @@ const ADMIN_ID = 6910486529;
 /* INITIAL VALUES */
 let balance = parseFloat(localStorage.getItem(balanceKey)) || 0.06;
 let referrals = parseInt(localStorage.getItem(refsKey)) || 0;
-let tasksCompleted = JSON.parse(localStorage.getItem(tasksKey)) || {}; // {task1:true, task2:true, ...}
-let referralsData = JSON.parse(localStorage.getItem(referralsKey)) || {}; // {referrerId: [referredUserIds]}
+let tasksCompleted = JSON.parse(localStorage.getItem(tasksKey)) || {}; // {taskId:true}
+let referralsData = JSON.parse(localStorage.getItem(referralsKey)) || {}; // {referrerId:[referredUserIds]}
 
-/* UTILITY */
+/* TASKS */
+const taskQueue = ["task-21541", "task-21543", "task-21544", "task-22205"];
+let taskIndex = 0;
+
 function updateUI() {
   document.getElementById("balance").textContent = balance.toFixed(2);
   document.getElementById("referrals").textContent = Object.keys(referralsData).length;
@@ -158,7 +170,7 @@ document.getElementById("referralBtn").addEventListener("click", () => {
   alert("Referral link copied!");
 });
 
-/* ADSGRAM */
+/* ADSGRAM INIT */
 const RewardAd = window.Adsgram.init({ blockId: "21542" });
 
 function addReward(amount) {
@@ -167,7 +179,7 @@ function addReward(amount) {
   updateUI();
 }
 
-/* PRELOAD AD THEN SHOW POPUP */
+/* SHOW POPUP OR MAIN */
 RewardAd.show().finally(() => {
   if (!localStorage.getItem(joinKey)) {
     document.getElementById("joinPopup").style.display = "flex";
@@ -195,35 +207,35 @@ document.getElementById("watchBtn").addEventListener("click", () => {
   });
 });
 
-/* TASK SYSTEM */
-const taskQueue = ["task-21541", "task-21543", "task-21544"];
-let taskIndex = 0;
-
+/* TASK BUTTON */
 document.getElementById("taskBtn").addEventListener("click", () => {
   document.getElementById("taskSection").style.display = "block";
   loadTask(taskQueue[taskIndex]);
 });
 
+/* LOAD TASK */
 function loadTask(id) {
   const newTask = document.createElement("adsgram-task");
   newTask.setAttribute("data-block-id", id);
   newTask.id = "currentTask";
-
   document.getElementById("currentTask").replaceWith(newTask);
 
   newTask.addEventListener("reward", () => {
     addReward(0.02);
 
-    // mark task as done in localStorage
     tasksCompleted[id] = true;
     localStorage.setItem(tasksKey, JSON.stringify(tasksCompleted));
 
-    if (taskIndex < taskQueue.length - 1) taskIndex++;
-    else {
-      taskIndex = 0;
-      addReward(0.06);
-      alert("🎉 Social task completed successfully!");
-      checkReferralReward(); // check if referrer should get $0.01
+    // Move to next task or reset if all 4 completed
+    if (taskIndex < taskQueue.length - 1) {
+      taskIndex++;
+    } else {
+      taskIndex = 0; // rotate again
+      // Show completion message 30 seconds
+      const msg = document.getElementById("taskMessage");
+      msg.style.display = "block";
+      setTimeout(()=>{ msg.style.display = "none"; },30000);
+      checkReferralReward();
     }
 
     loadTask(taskQueue[taskIndex]);
@@ -233,10 +245,10 @@ function loadTask(id) {
 /* REFERRAL REWARD */
 function checkReferralReward() {
   const urlParams = new URLSearchParams(window.location.search);
-  const referrerId = urlParams.get('start'); // get referrer ID
+  const referrerId = urlParams.get('start');
   if (!referrerId) return;
 
-  // Only reward if all tasks completed
+  // Only reward if user completed all 4 tasks
   if (Object.keys(tasksCompleted).length >= taskQueue.length) {
     if (!referralsData[referrerId]) referralsData[referrerId] = [];
     if (!referralsData[referrerId].includes(tg.initDataUnsafe.user.id)) {
@@ -244,6 +256,7 @@ function checkReferralReward() {
       localStorage.setItem(referralsKey, JSON.stringify(referralsData));
       addReward(0.01); // reward for referrer
       alert("💰 You earned $0.01 from your referral!");
+      renderLeaderboard(); // update leadership rank
     }
   }
 }
@@ -252,7 +265,6 @@ function checkReferralReward() {
 document.getElementById("withdrawBtn").addEventListener("click", () => {
   if (balance < 5) return alert("❌ Minimum withdraw is $5");
 
-  // send withdraw to admin
   tg.sendData(JSON.stringify({
     action: "forward_to_admin",
     admin_id: ADMIN_ID,
@@ -260,9 +272,7 @@ document.getElementById("withdrawBtn").addEventListener("click", () => {
     amount: balance
   }));
 
-  // notify user
   alert("✅ Your withdrawal request has been forwarded to the admin.");
-
   balance = 0;
   localStorage.setItem(balanceKey, balance.toFixed(2));
   updateUI();
@@ -274,6 +284,7 @@ document.getElementById("leadershipBtn").addEventListener("click", () => {
   renderLeaderboard();
 });
 
+/* RENDER LEADERBOARD */
 function renderLeaderboard() {
   const list = document.getElementById("leaderboardList");
   list.innerHTML = '';
@@ -281,50 +292,46 @@ function renderLeaderboard() {
   const rewardsDate = new Date("2026-03-14T00:00:00");
   const now = new Date();
 
-  // calculate leaderboard
   const leaderboard = [];
   for (let ref in referralsData) {
     const count = referralsData[ref].length;
     leaderboard.push({ ref, count });
   }
 
-  leaderboard.sort((a,b) => b.count - a.count); // highest first
+  leaderboard.sort((a,b)=>b.count - a.count);
 
-  leaderboard.forEach((entry, idx) => {
+  leaderboard.forEach((entry, idx)=>{
     const li = document.createElement('li');
     li.textContent = `#${idx+1} User: ${entry.ref} Referrals: ${entry.count}`;
     list.appendChild(li);
 
     // auto payout after end date
-    if (now >= rewardsDate) {
+    if(now>=rewardsDate){
       let reward = 0;
-      if (idx === 0) reward = 60;
-      else if (idx === 1) reward = 15;
-      else if (idx === 2) reward = 10;
-      else if (idx === 3) reward = 5;
-      else if (idx === 4) reward = 3;
-      else if (idx >=5 && idx < 10) reward = 1;
+      if(idx===0) reward=60;
+      else if(idx===1) reward=15;
+      else if(idx===2) reward=10;
+      else if(idx===3) reward=5;
+      else if(idx===4) reward=3;
+      else if(idx>=5 && idx<10) reward=1;
 
-      if (reward > 0 && !JSON.parse(localStorage.getItem(leadershipRewardsKey) || '[]').includes(entry.ref)) {
-        addRewardToUser(entry.ref, reward);
+      if(reward>0 && !JSON.parse(localStorage.getItem(leadershipRewardsKey) || '[]').includes(entry.ref)){
+        addRewardToUser(entry.ref,reward);
       }
     }
   });
 }
 
 /* CREDIT LEADERSHIP REWARD */
-function addRewardToUser(userId, amount) {
-  // Only credit if this is the current user
-  if (tg.initDataUnsafe.user.id == userId) {
+function addRewardToUser(userId,amount){
+  if(tg.initDataUnsafe.user.id==userId){
     addReward(amount);
     alert(`🏆 Leadership reward $${amount} added to your balance!`);
   }
-
-  // store paid users
-  let paidUsers = JSON.parse(localStorage.getItem(leadershipRewardsKey) || '[]');
-  if (!paidUsers.includes(userId)) {
+  let paidUsers=JSON.parse(localStorage.getItem(leadershipRewardsKey)||'[]');
+  if(!paidUsers.includes(userId)){
     paidUsers.push(userId);
-    localStorage.setItem(leadershipRewardsKey, JSON.stringify(paidUsers));
+    localStorage.setItem(leadershipRewardsKey,JSON.stringify(paidUsers));
   }
 }
 </script>
