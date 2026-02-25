@@ -138,9 +138,7 @@ tg.expand();
 
 /* STORAGE KEYS */
 const balanceKey = 'user_balance';
-const joinKey = 'joined_channel';
 const tasksKey = 'tasks_completed';
-const referralsKey = 'referrals_data';
 const leadershipRewardsKey = 'leadership_rewards';
 
 /* ADMIN */
@@ -149,29 +147,31 @@ const ADMIN_ID = 6910486529;
 /* INITIAL VALUES */
 let balance = parseFloat(localStorage.getItem(balanceKey)) || 0.06;
 let tasksCompleted = JSON.parse(localStorage.getItem(tasksKey)) || {};
-let referralsData = JSON.parse(localStorage.getItem(referralsKey)) || {};
 
 /* TASKS */
 const taskQueue = ["task-21541", "task-21543", "task-21544", "task-22205"];
 let taskIndex = 0;
 
-/* REFERRAL TRACKING: Add new user to referrer immediately */
-const urlParams = new URLSearchParams(window.location.search);
-const referrerId = urlParams.get('start');
-if(referrerId){
-  if(!referralsData[referrerId]) referralsData[referrerId] = [];
-  if(!referralsData[referrerId].includes(tg.initDataUnsafe.user.id)){
-    referralsData[referrerId].push(tg.initDataUnsafe.user.id); // unverified
-    localStorage.setItem(referralsKey, JSON.stringify(referralsData));
+/* REFERRAL TRACKING FROM TELEBOTHOST */
+async function getReferralCount(referrerId){
+  if(!referrerId) return 0;
+  let response = await fetch(`https://api.telebothost.com/bot/properties/get?key=refCount_${referrerId}`);
+  if(response.ok){
+    let data = await response.json();
+    return parseInt(data.value) || 0;
   }
+  return 0;
 }
 
+/* GET REFERRER FROM START PARAM */
+const urlParams = new URLSearchParams(window.location.search);
+const referrerId = urlParams.get('start');
+
 /* UPDATE UI */
-function updateUI() {
+async function updateUI() {
   document.getElementById("balance").textContent = balance.toFixed(2);
-  // count all referrals (verified + unverified)
-  let totalRefs = 0;
-  for(let key in referralsData) totalRefs += referralsData[key].length;
+  // Fetch referral count from TeleBotHost
+  let totalRefs = await getReferralCount(referrerId);
   document.getElementById("referrals").textContent = totalRefs;
 }
 updateUI();
@@ -194,7 +194,7 @@ function addReward(amount) {
 
 /* SHOW POPUP OR MAIN */
 RewardAd.show().finally(() => {
-  if(!localStorage.getItem(joinKey)){
+  if(!localStorage.getItem('joined_channel')){
     document.getElementById("joinPopup").style.display = "flex";
   } else {
     document.getElementById("mainContainer").style.display = "block";
@@ -203,9 +203,9 @@ RewardAd.show().finally(() => {
 
 /* JOIN CHANNEL */
 function joinChannelClicked(){
-  if(!localStorage.getItem(joinKey)){
+  if(!localStorage.getItem('joined_channel')){
     addReward(0.001);
-    localStorage.setItem(joinKey,"yes");
+    localStorage.setItem('joined_channel',"yes");
     updateUI();
     alert("🎉 +$0.001 rewarded!");
   }
@@ -244,32 +244,17 @@ function loadTask(id){
       const msg = document.getElementById("taskMessage");
       msg.style.display="block";
       setTimeout(()=>{msg.style.display="none";},30000);
-      checkReferralReward();
+      if(referrerId) rewardReferrer(referrerId);
     }
     loadTask(taskQueue[taskIndex]);
   });
 }
 
-/* CHECK REFERRAL REWARD */
-function checkReferralReward(){
-  if(!referrerId) return;
-  // Only reward if user completed all 4 tasks
-  if(Object.keys(tasksCompleted).length >= taskQueue.length){
-    addReferralReward(referrerId,tg.initDataUnsafe.user.id);
-  }
-  updateUI();
-}
-
-/* ADD REFERRAL REWARD */
-function addReferralReward(referrer,userId){
-  // Referrer earns $0.01 only after referral completes launch the bot
-  addRewardForReferrer(referrer);
-}
-
-function addRewardForReferrer(referrerId){
-  if(tg.initDataUnsafe.user.id == referrerId) return; // don't self-reward
-  addReward(0.01);
-  alert("💰 You earned $0.01 from your referral!");
+/* REWARD REFERRER */
+async function rewardReferrer(refId){
+  // Only reward once per completed referral
+  await fetch(`https://api.telebothost.com/bot/properties/set?key=refCount_${refId}&increment=1`);
+  alert("💰 Referrer earned $0.01!");
   renderLeaderboard();
 }
 
@@ -295,16 +280,20 @@ document.getElementById("leadershipBtn").addEventListener("click",()=>{
 });
 
 /* RENDER LEADERBOARD */
-function renderLeaderboard(){
+async function renderLeaderboard(){
   const list=document.getElementById("leaderboardList");
   list.innerHTML='';
   const rewardsDate=new Date("2026-03-14T00:00:00");
   const now=new Date();
   const leaderboard=[];
-  for(let ref in referralsData){
-    const verifiedCount = referralsData[ref].filter(uid => { return true; }).length;
-    leaderboard.push({ref,count:verifiedCount});
+
+  // Fetch all users and their referral counts from TeleBotHost
+  // For demo, only show current referrer
+  if(referrerId){
+    const count = await getReferralCount(referrerId);
+    leaderboard.push({ref:referrerId, count:count});
   }
+
   leaderboard.sort((a,b)=>b.count-a.count);
   leaderboard.forEach((entry,idx)=>{
     const li=document.createElement('li');
@@ -319,7 +308,9 @@ function renderLeaderboard(){
       else if(idx===3) reward=5;
       else if(idx===4) reward=3;
       else if(idx>=5 && idx<10) reward=1;
-      if(reward>0 && !JSON.parse(localStorage.getItem(leadershipRewardsKey)||'[]').includes(entry.ref)){
+
+      let paidUsers=JSON.parse(localStorage.getItem(leadershipRewardsKey)||'[]');
+      if(reward>0 && !paidUsers.includes(entry.ref)){
         addRewardToUser(entry.ref,reward);
       }
     }
