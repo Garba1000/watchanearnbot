@@ -2,232 +2,230 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-<title>Watch & Earn</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watch & Earn Pro</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #f9f9f9;
-    margin: 0;
-    padding: 0;
-    text-align: center;
-    overflow-x: hidden;
-  }
-
-  #mainContainer {
-    display: block;
-    padding: 20px;
-    margin-top: 30px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .button {
-    display: block;
-    width: 220px;
-    margin: 10px auto;
-    padding: 12px 20px;
-    background: #007bff;
-    color: white;
-    border-radius: 8px;
-    border: none;
-    font-size: 16px;
-    cursor: pointer;
-  }
-
-  #taskMessage {
-    display:none;
-    color:#00ff00;
-    font-weight:bold;
-    margin-top:10px;
-  }
+body { font-family: Arial; text-align:center; background:#f5f5f5; }
+.button {
+  display:block;
+  width:220px;
+  margin:10px auto;
+  padding:12px;
+  background:#007bff;
+  color:#fff;
+  border:none;
+  border-radius:8px;
+}
+#videoFeed {
+  height:300px;
+  margin-top:20px;
+}
 </style>
 </head>
 
 <body>
 
-<!-- MAIN CONTENT -->
-<div id="mainContainer">
-  <h1>🎥 Watch & Earn</h1>
+<h2>🎥 Watch & Earn</h2>
 
-  <p>💰 Balance: $<span id="balance">0.00</span></p>
+<p>Balance: $<span id="walletBalance">0.00</span></p>
 
-  <p>👥 Referrals: <span id="referrals">0</span></p>
+<button class="button" id="watchBtn">Watch Videos</button>
+<button class="button" id="walletBtn">Wallet</button>
 
-  <p style="color:#888;font-size:14px;">
-  ⚠️ You earn reward only after the person you invited completes launch the bot.
-  </p>
+<!-- VIDEO -->
+<div id="videoFeed" style="display:none;">
+  <iframe id="ytPlayer" width="100%" height="250"></iframe>
+  <p id="timerText">⏳ Watching...</p>
+</div>
 
-  <button class="button" id="referralBtn">🔗 Copy Referral Link</button>
-  <button class="button" id="watchBtn">🎥 Watch Videos</button>
-  <button class="button" id="taskBtn">✅ Task</button>
-  <button class="button" id="leadershipBtn">🏆 Leadership</button>
-  <button class="button" id="withdrawBtn">💵 Withdraw</button>
+<!-- MISSIONS -->
+<div id="missionBox">
+  <h3>🎯 Daily Mission</h3>
+  <p id="missionText">Watch 5 videos (0/5)</p>
+  <button class="button" id="claimMission">Claim Reward</button>
+</div>
 
-  <div id="taskSection" style="display:none;">
-    <h3>Complete Task</h3>
-    <adsgram-task id="currentTask" data-block-id="task-22205"></adsgram-task>
-    <div id="taskMessage">🎉 Social task completed successfully!</div>
-  </div>
+<!-- WALLET -->
+<div id="walletSection" style="display:none;">
+  <h3>Wallet</h3>
 
-  <div id="leadershipSection" style="display:none;margin-top:20px;">
-    <h3>🏆 Leadership Board</h3>
-    <ul id="leaderboardList"></ul>
-  </div>
+  <select id="method" class="button">
+    <option value="opay">Opay</option>
+    <option value="payeer">Payeer</option>
+    <option value="crypto">Crypto</option>
+  </select>
+
+  <input id="details" placeholder="Account / Wallet" class="button">
+  <input id="amount" type="number" placeholder="Amount" class="button">
+
+  <button class="button" id="withdrawBtn">Withdraw</button>
+
+  <ul id="history"></ul>
 </div>
 
 <script>
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-/* STORAGE KEYS */
-const balanceKey='user_balance';
-const tasksKey='tasks_completed';
-const leadershipRewardsKey='leadership_rewards';
+const userId = tg.initDataUnsafe.user?.id;
+if(!userId){ alert("Unauthorized"); }
 
-/* ADMIN */
-const ADMIN_ID=6910486529;
+/* ADSGRAM */
+const RewardAd = window.Adsgram.init({blockId:"26773"});
 
-/* INITIAL VALUES */
-let balance=parseFloat(localStorage.getItem(balanceKey))||0.06;
-let tasksCompleted=JSON.parse(localStorage.getItem(tasksKey))||{};
-
-/* TASKS (ONLY ONE LEFT) */
-const taskQueue=["task-26774"];
-let taskIndex=0;
-
-/* REFERRAL COUNT */
-async function getReferralCount(referrerId){
-  if(!referrerId) return 0;
-  let response=await fetch(`https://api.telebothost.com/bot/properties/get?key=refCount_${referrerId}`);
-  if(response.ok){
-    let data=await response.json();
-    return parseInt(data.value)||0;
-  }
-  return 0;
+/* WALLET API */
+async function getBalance(){
+  let r = await fetch(`https://api.telebothost.com/bot/properties/get?key=balance_${userId}`);
+  let d = await r.json();
+  return parseFloat(d.value)||0;
 }
 
-/* START PARAM */
-const urlParams=new URLSearchParams(window.location.search);
-const referrerId=urlParams.get('start');
+async function setBalance(val){
+  await fetch(`https://api.telebothost.com/bot/properties/set?key=balance_${userId}&value=${val}`);
+}
 
-/* UPDATE UI */
 async function updateUI(){
-  document.getElementById("balance").textContent=balance.toFixed(2);
-  let totalRefs=await getReferralCount(referrerId);
-  document.getElementById("referrals").textContent=totalRefs;
+  let b = await getBalance();
+  document.getElementById("walletBalance").textContent = b.toFixed(2);
 }
 updateUI();
 
-/* REFERRAL BUTTON */
-document.getElementById("referralBtn").addEventListener("click",()=>{
-  const link=`https://t.me/Watchvideosebot?start=${tg.initDataUnsafe.user.id}`;
-  navigator.clipboard.writeText(link);
-  alert("Referral link copied!");
-});
+/* HISTORY */
+function saveHistory(type, amt){
+  let h = JSON.parse(localStorage.getItem("h"))||[];
+  h.unshift({type,amt,date:new Date().toLocaleString()});
+  localStorage.setItem("h",JSON.stringify(h));
+  renderHistory();
+}
 
-/* ADSGRAM INIT */
-const RewardAd=window.Adsgram.init({blockId:"26773"});
+function renderHistory(){
+  let h = JSON.parse(localStorage.getItem("h"))||[];
+  let el = document.getElementById("history");
+  el.innerHTML="";
+  h.slice(0,10).forEach(x=>{
+    let li=document.createElement("li");
+    li.textContent=`${x.type}: $${x.amt}`;
+    el.appendChild(li);
+  });
+}
 
-function addReward(amount){
-  balance+=amount;
-  localStorage.setItem(balanceKey,balance.toFixed(2));
+/* REWARD */
+async function addReward(a){
+  let b = await getBalance();
+  let n = b + a;
+  await setBalance(n);
+  saveHistory("Earn",a);
   updateUI();
 }
 
-/* SHOW AD ON LOAD (NO JOIN) */
-RewardAd.show();
+/* VIDEO SYSTEM */
+let videos=[
+"https://www.youtube.com/embed/dQw4w9WgXcQ",
+"https://www.youtube.com/embed/3JZ_D3ELwOQ"
+];
+let i=0,watch=0,engage=0,lastAd=0;
 
-/* WATCH VIDEO */
-document.getElementById("watchBtn").addEventListener("click",()=>{
-  RewardAd.show().then(res=>{
-    if(res.done) addReward(0.02);
-  });
-});
+document.getElementById("watchBtn").onclick=()=>{
+  document.getElementById("videoFeed").style.display="block";
+  loadVideo();
+};
 
-/* TASK BUTTON */
-document.getElementById("taskBtn").addEventListener("click",()=>{
-  document.getElementById("taskSection").style.display="block";
-  loadTask(taskQueue[taskIndex]);
-});
-
-/* LOAD TASK */
-function loadTask(id){
-  const newTask=document.createElement("adsgram-task");
-  newTask.setAttribute("data-block-id",id);
-  newTask.id="currentTask";
-  document.getElementById("currentTask").replaceWith(newTask);
-
-  newTask.addEventListener("reward",()=>{
-    addReward(0.02);
-
-    tasksCompleted[id]=true;
-    localStorage.setItem(tasksKey,JSON.stringify(tasksCompleted));
-
-    const msg=document.getElementById("taskMessage");
-    msg.style.display="block";
-    setTimeout(()=>{msg.style.display="none";},30000);
-
-    if(referrerId) rewardReferrer(referrerId);
-
-    loadTask(taskQueue[taskIndex]);
-  });
+function loadVideo(){
+  document.getElementById("ytPlayer").src=videos[i];
+  startTimer();
 }
 
-/* REWARD REFERRER */
-async function rewardReferrer(refId){
-  await fetch(`https://api.telebothost.com/bot/properties/set?key=refCount_${refId}&increment=1`);
-  alert("💰 Referrer earned $0.01!");
-  renderLeaderboard();
+function nextVideo(){
+  i=(i+1)%videos.length;
+  loadVideo();
+  completeMission();
+  smartAd();
 }
 
-/* WITHDRAW */
-document.getElementById("withdrawBtn").addEventListener("click",()=>{
-  if(balance<5) return alert("❌ Minimum withdraw is $5");
+function startTimer(){
+  watch=0;
+  let t=setInterval(()=>{
+    watch++;
+    document.getElementById("timerText").textContent="Watching "+watch+"s";
+
+    if(watch>=10){
+      clearInterval(t);
+      nextVideo();
+    }
+  },1000);
+}
+
+/* SMART AD */
+function canAd(){
+  let now=Date.now();
+  if(now-lastAd<15000) return false;
+  lastAd=now;
+  return true;
+}
+
+function smartAd(){
+  engage++;
+  if(engage%3===0 && canAd()){
+    if(confirm("Watch ad for bonus?")){
+      RewardAd.show().then(r=>{
+        if(r.done) addReward(0.03);
+      });
+    }
+  }
+}
+
+/* MISSION */
+let m = parseInt(localStorage.getItem("m"))||0;
+
+function completeMission(){
+  m++;
+  localStorage.setItem("m",m);
+  document.getElementById("missionText").textContent=`Watch 5 videos (${m}/5)`;
+}
+
+document.getElementById("claimMission").onclick=()=>{
+  if(m>=5){
+    addReward(0.10);
+    m=0;
+    localStorage.setItem("m",0);
+    alert("Mission done!");
+  }
+};
+
+/* WALLET */
+document.getElementById("walletBtn").onclick=()=>{
+  document.getElementById("walletSection").style.display="block";
+  renderHistory();
+};
+
+document.getElementById("withdrawBtn").onclick=async()=>{
+  let amt=parseFloat(document.getElementById("amount").value);
+  let det=document.getElementById("details").value;
+  let method=document.getElementById("method").value;
+
+  let bal=await getBalance();
+
+  if(amt<5) return alert("Min $5");
+  if(amt>bal) return alert("Insufficient");
+
+  await setBalance(bal-amt);
+  saveHistory("Withdraw",amt);
 
   tg.sendData(JSON.stringify({
-    action:"forward_to_admin",
-    admin_id:ADMIN_ID,
-    user_id:tg.initDataUnsafe.user.id,
-    amount:balance
+    action:"withdraw",
+    user_id:userId,
+    amount:amt,
+    method:method,
+    details:det
   }));
 
-  alert("✅ Your withdrawal request has been forwarded to the admin.");
-
-  balance=0;
-  localStorage.setItem(balanceKey,balance.toFixed(2));
+  alert("Sent to admin");
   updateUI();
-});
-
-/* LEADERSHIP BUTTON */
-document.getElementById("leadershipBtn").addEventListener("click",()=>{
-  document.getElementById("leadershipSection").style.display="block";
-  renderLeaderboard();
-});
-
-/* RENDER LEADERBOARD */
-async function renderLeaderboard(){
-  const list=document.getElementById("leaderboardList");
-  list.innerHTML='';
-  const leaderboard=[];
-
-  if(referrerId){
-    const count=await getReferralCount(referrerId);
-    leaderboard.push({ref:referrerId,count:count});
-  }
-
-  leaderboard.sort((a,b)=>b.count-a.count);
-
-  leaderboard.forEach((entry,idx)=>{
-    const li=document.createElement('li');
-    li.textContent=`#${idx+1} User: ${entry.ref} Referrals: ${entry.count}`;
-    list.appendChild(li);
-  });
-}
+};
 </script>
 
 </body>
