@@ -20,21 +20,18 @@ body { font-family: Arial; text-align:center; background:#f5f5f5; }
   border:none;
   border-radius:8px;
 }
-#videoFeed {
-  height:300px;
-  margin-top:20px;
-}
 </style>
 </head>
 
 <body>
 
 <h2>🎥 Watch & Earn</h2>
-
 <p>Balance: $<span id="walletBalance">0.00</span></p>
+<p id="vipStatus">👤 Normal User</p>
 
-<button class="button" id="watchBtn">Watch Videos</button>
-<button class="button" id="walletBtn">Wallet</button>
+<button class="button" id="watchBtn">🎬 Watch Videos</button>
+<button class="button" id="taskBtn">✅ Tasks</button>
+<button class="button" id="walletBtn">👛 Wallet</button>
 
 <!-- VIDEO -->
 <div id="videoFeed" style="display:none;">
@@ -42,11 +39,14 @@ body { font-family: Arial; text-align:center; background:#f5f5f5; }
   <p id="timerText">⏳ Watching...</p>
 </div>
 
-<!-- MISSIONS -->
-<div id="missionBox">
-  <h3>🎯 Daily Mission</h3>
-  <p id="missionText">Watch 5 videos (0/5)</p>
-  <button class="button" id="claimMission">Claim Reward</button>
+<!-- TASK -->
+<div id="taskSection" style="display:none;">
+  <h3>🎯 Daily Tasks</h3>
+
+  <adsgram-task id="currentTask" data-block-id="task-22205"></adsgram-task>
+
+  <p id="taskMsg" style="color:green;display:none;"></p>
+  <p id="taskLimit" style="color:red;display:none;"></p>
 </div>
 
 <!-- WALLET -->
@@ -77,7 +77,7 @@ if(!userId){ alert("Unauthorized"); }
 /* ADSGRAM */
 const RewardAd = window.Adsgram.init({blockId:"26773"});
 
-/* WALLET API */
+/* WALLET */
 async function getBalance(){
   let r = await fetch(`https://api.telebothost.com/bot/properties/get?key=balance_${userId}`);
   let d = await r.json();
@@ -90,7 +90,7 @@ async function setBalance(val){
 
 async function updateUI(){
   let b = await getBalance();
-  document.getElementById("walletBalance").textContent = b.toFixed(2);
+  document.getElementById("walletBalance").textContent = b.toFixed(3);
 }
 updateUI();
 
@@ -99,18 +99,6 @@ function saveHistory(type, amt){
   let h = JSON.parse(localStorage.getItem("h"))||[];
   h.unshift({type,amt,date:new Date().toLocaleString()});
   localStorage.setItem("h",JSON.stringify(h));
-  renderHistory();
-}
-
-function renderHistory(){
-  let h = JSON.parse(localStorage.getItem("h"))||[];
-  let el = document.getElementById("history");
-  el.innerHTML="";
-  h.slice(0,10).forEach(x=>{
-    let li=document.createElement("li");
-    li.textContent=`${x.type}: $${x.amt}`;
-    el.appendChild(li);
-  });
 }
 
 /* REWARD */
@@ -127,8 +115,25 @@ let videos=[
 "https://www.youtube.com/embed/dQw4w9WgXcQ",
 "https://www.youtube.com/embed/3JZ_D3ELwOQ"
 ];
-let i=0,watch=0,engage=0,lastAd=0;
 
+let i=0,watch=0,engage=0,lastAd=0;
+let totalWatch = parseInt(localStorage.getItem("watchCount"))||0;
+
+/* VIP CHECK */
+function checkVIP(){
+  if(totalWatch >= 20){
+    localStorage.setItem("vip","yes");
+  }
+}
+
+function updateVIP(){
+  let vip = localStorage.getItem("vip");
+  document.getElementById("vipStatus").textContent =
+    vip==="yes" ? "💎 VIP User" : "👤 Normal User";
+}
+updateVIP();
+
+/* WATCH */
 document.getElementById("watchBtn").onclick=()=>{
   document.getElementById("videoFeed").style.display="block";
   loadVideo();
@@ -141,11 +146,17 @@ function loadVideo(){
 
 function nextVideo(){
   i=(i+1)%videos.length;
+  totalWatch++;
+  localStorage.setItem("watchCount", totalWatch);
+
+  checkVIP();
+  updateVIP();
+
   loadVideo();
-  completeMission();
   smartAd();
 }
 
+/* TIMER */
 function startTimer(){
   watch=0;
   let t=setInterval(()=>{
@@ -159,7 +170,7 @@ function startTimer(){
   },1000);
 }
 
-/* SMART AD */
+/* ADS */
 function canAd(){
   let now=Date.now();
   if(now-lastAd<15000) return false;
@@ -178,52 +189,103 @@ function smartAd(){
   }
 }
 
-/* MISSION */
-let m = parseInt(localStorage.getItem("m"))||0;
+/* VIP TASK SYSTEM */
+const taskBlocks = ["task-22205","task-26774"];
+let taskIndex = 0;
 
-function completeMission(){
-  m++;
-  localStorage.setItem("m",m);
-  document.getElementById("missionText").textContent=`Watch 5 videos (${m}/5)`;
+function getTaskConfig(){
+  let vip = localStorage.getItem("vip");
+  return vip==="yes"
+    ? {reward:0.005, limit:10}
+    : {reward:0.002, limit:5};
 }
 
-document.getElementById("claimMission").onclick=()=>{
-  if(m>=5){
-    addReward(0.10);
-    m=0;
-    localStorage.setItem("m",0);
-    alert("Mission done!");
+let taskData = JSON.parse(localStorage.getItem("taskData")) || {
+  date:new Date().toDateString(),
+  completed:0
+};
+
+function resetTasks(){
+  let today=new Date().toDateString();
+  if(taskData.date!==today){
+    taskData={date:today,completed:0};
+    localStorage.setItem("taskData",JSON.stringify(taskData));
   }
+}
+
+function loadTask(id){
+  let cfg = getTaskConfig();
+
+  if(taskData.completed >= cfg.limit){
+    document.getElementById("taskLimit").textContent =
+      "⏳ Daily limit reached";
+    document.getElementById("taskLimit").style.display="block";
+    return;
+  }
+
+  document.getElementById("taskLimit").style.display="none";
+
+  let t=document.createElement("adsgram-task");
+  t.setAttribute("data-block-id",id);
+  t.id="currentTask";
+
+  document.getElementById("currentTask").replaceWith(t);
+
+  t.addEventListener("reward",()=>handleTask());
+}
+
+let lastTask=0;
+
+function handleTask(){
+  let now=Date.now();
+  if(now-lastTask<10000) return alert("Wait...");
+
+  lastTask=now;
+
+  let cfg = getTaskConfig();
+
+  addReward(cfg.reward);
+
+  taskData.completed++;
+  localStorage.setItem("taskData",JSON.stringify(taskData));
+
+  document.getElementById("taskMsg").textContent =
+    "✅ Earned $" + cfg.reward;
+  document.getElementById("taskMsg").style.display="block";
+
+  setTimeout(()=>{document.getElementById("taskMsg").style.display="none";},3000);
+
+  taskIndex=(taskIndex+1)%taskBlocks.length;
+  loadTask(taskBlocks[taskIndex]);
+}
+
+document.getElementById("taskBtn").onclick=()=>{
+  document.getElementById("taskSection").style.display="block";
+  resetTasks();
+  loadTask(taskBlocks[taskIndex]);
 };
 
 /* WALLET */
 document.getElementById("walletBtn").onclick=()=>{
   document.getElementById("walletSection").style.display="block";
-  renderHistory();
 };
 
 document.getElementById("withdrawBtn").onclick=async()=>{
   let amt=parseFloat(document.getElementById("amount").value);
-  let det=document.getElementById("details").value;
-  let method=document.getElementById("method").value;
-
   let bal=await getBalance();
 
-  if(amt<5) return alert("Min $5");
+  if(amt<2) return alert("Min $2");
   if(amt>bal) return alert("Insufficient");
 
   await setBalance(bal-amt);
-  saveHistory("Withdraw",amt);
 
   tg.sendData(JSON.stringify({
     action:"withdraw",
     user_id:userId,
-    amount:amt,
-    method:method,
-    details:det
+    amount:amt
   }));
 
-  alert("Sent to admin");
+  alert("Sent");
   updateUI();
 };
 </script>
