@@ -10,7 +10,7 @@
 
 <style>
 body { font-family: Arial; text-align:center; background:#f5f5f5; }
-.button {
+.button{
   display:block;
   width:220px;
   margin:10px auto;
@@ -26,27 +26,20 @@ body { font-family: Arial; text-align:center; background:#f5f5f5; }
 <body>
 
 <h2>🎥 Watch & Earn</h2>
-<p>Balance: $<span id="walletBalance">0.00</span></p>
-<p id="vipStatus">👤 Normal User</p>
+<p>Balance: $<span id="walletBalance">0.000</span></p>
 
 <button class="button" id="watchBtn">🎬 Watch Videos</button>
 <button class="button" id="taskBtn">✅ Tasks</button>
 <button class="button" id="walletBtn">👛 Wallet</button>
 
 <!-- VIDEO -->
-<div id="videoFeed" style="display:none;">
-  <iframe id="ytPlayer" width="100%" height="250"></iframe>
-  <p id="timerText">⏳ Watching...</p>
-</div>
+<div id="videoFeed" style="display:none;"></div>
 
 <!-- TASK -->
 <div id="taskSection" style="display:none;">
-  <h3>🎯 Daily Tasks</h3>
-
+  <h3>🎯 Tasks</h3>
   <adsgram-task id="currentTask" data-block-id="task-22205"></adsgram-task>
-
   <p id="taskMsg" style="color:green;display:none;"></p>
-  <p id="taskLimit" style="color:red;display:none;"></p>
 </div>
 
 <!-- WALLET -->
@@ -54,17 +47,22 @@ body { font-family: Arial; text-align:center; background:#f5f5f5; }
   <h3>Wallet</h3>
 
   <select id="method" class="button">
-    <option value="opay">Opay</option>
-    <option value="payeer">Payeer</option>
-    <option value="crypto">Crypto</option>
+    <option>Opay</option>
+    <option>Payeer</option>
+    <option>Crypto</option>
   </select>
 
-  <input id="details" placeholder="Account / Wallet" class="button">
-  <input id="amount" type="number" placeholder="Amount" class="button">
+  <input id="details" class="button" placeholder="Account / Wallet">
+  <input id="amount" type="number" class="button" placeholder="Amount">
 
   <button class="button" id="withdrawBtn">Withdraw</button>
+</div>
 
-  <ul id="history"></ul>
+<!-- REFERRAL -->
+<div>
+  <h3>👥 Referral</h3>
+  <input id="refLink" class="button" readonly>
+  <p>Total referrals: <span id="refCount">0</span></p>
 </div>
 
 <script>
@@ -74,198 +72,292 @@ tg.expand();
 const userId = tg.initDataUnsafe.user?.id;
 if(!userId){ alert("Unauthorized"); }
 
-/* ADSGRAM */
-const RewardAd = window.Adsgram.init({blockId:"27001"});
+const API = "https://api.telebothost.com/bot/properties";
 
-/* WALLET */
+/* ================= ANTI CHEAT ================= */
+let lastActionTime = 0;
+let actionCount = 0;
+let blockUntil = 0;
+
+function canEarn(){
+  let now = Date.now();
+
+  if(now < blockUntil){
+    alert("⚠️ Too fast! Try later.");
+    return false;
+  }
+
+  if(now - lastActionTime < 3000){
+    actionCount++;
+  }else{
+    actionCount = 0;
+  }
+
+  lastActionTime = now;
+
+  if(actionCount >= 5){
+    blockUntil = now + 60000;
+    alert("🚫 Suspicious activity");
+    return false;
+  }
+
+  return true;
+}
+
+/* DAILY LIMIT */
+function checkDailyLimit(){
+  let today = new Date().toDateString();
+
+  let data = JSON.parse(localStorage.getItem("dailyEarn")) || {
+    date: today,
+    amount: 0
+  };
+
+  if(data.date !== today){
+    data = {date: today, amount: 0};
+  }
+
+  if(data.amount >= 0.5){
+    alert("⛔ Daily limit reached");
+    return false;
+  }
+
+  data.amount += 0.001;
+  localStorage.setItem("dailyEarn", JSON.stringify(data));
+
+  return true;
+}
+
+/* ================= WALLET ================= */
 async function getBalance(){
-  let r = await fetch(`https://api.telebothost.com/bot/properties/get?key=balance_${userId}`);
+  let r = await fetch(`${API}/get?key=balance_${userId}`);
   let d = await r.json();
   return parseFloat(d.value)||0;
 }
 
 async function setBalance(val){
-  await fetch(`https://api.telebothost.com/bot/properties/set?key=balance_${userId}&value=${val}`);
+  await fetch(`${API}/set?key=balance_${userId}&value=${val}`);
+}
+
+async function addReward(a){
+  if(!canEarn()) return;
+  if(!checkDailyLimit()) return;
+
+  let b = await getBalance();
+  await setBalance(b + a);
+  updateUI();
 }
 
 async function updateUI(){
   let b = await getBalance();
-  document.getElementById("walletBalance").textContent = b.toFixed(3);
+  document.getElementById("walletBalance").innerText = b.toFixed(3);
 }
 updateUI();
 
-/* HISTORY */
-function saveHistory(type, amt){
-  let h = JSON.parse(localStorage.getItem("h"))||[];
-  h.unshift({type,amt,date:new Date().toLocaleString()});
-  localStorage.setItem("h",JSON.stringify(h));
+/* ================= PV SYSTEM ================= */
+let pv = parseInt(localStorage.getItem("pv"))||0;
+let level = parseInt(localStorage.getItem("level"))||1;
+
+function updateStats(){
+  document.getElementById("pvText").innerText = pv;
+  document.getElementById("levelText").innerText = level;
 }
 
-/* REWARD */
-async function addReward(a){
+function addPV(a){
+  if(!canEarn()) return;
+
+  pv += a;
+
+  if(pv >= level*50){
+    pv = 0;
+    level++;
+  }
+
+  localStorage.setItem("pv",pv);
+  localStorage.setItem("level",level);
+
+  updateStats();
+}
+
+/* PV CONVERT */
+async function convertPV(){
+  if(pv < 1000) return alert("Need 1000 PV");
+
+  let usd = (pv/1000)*0.1;
+  pv = 0;
+
+  localStorage.setItem("pv",0);
+
   let b = await getBalance();
-  let n = b + a;
-  await setBalance(n);
-  saveHistory("Earn",a);
+  await setBalance(b + usd);
+
   updateUI();
+  updateStats();
+
+  alert("Converted $" + usd.toFixed(3));
 }
 
-/* VIDEO SYSTEM */
-let videos=[
-"https://www.youtube.com/embed/dQw4w9WgXcQ",
-"https://www.youtube.com/embed/3JZ_D3ELwOQ"
-];
+/* ================= REFERRAL ================= */
+function getRef(){
+  return tg.initDataUnsafe.start_param || null;
+}
 
-let i=0,watch=0,engage=0,lastAd=0;
-let totalWatch = parseInt(localStorage.getItem("watchCount"))||0;
+async function getUser(){
+  let r = await fetch(`${API}/get?key=user_${userId}`);
+  let d = await r.json();
+  return d.value ? JSON.parse(d.value) : null;
+}
 
-/* VIP CHECK */
-function checkVIP(){
-  if(totalWatch >= 20){
-    localStorage.setItem("vip","yes");
+async function saveUser(data){
+  await fetch(`${API}/set?key=user_${userId}&value=${encodeURIComponent(JSON.stringify(data))}`);
+}
+
+async function addBalance(uid, amt){
+  let r = await fetch(`${API}/get?key=balance_${uid}`);
+  let d = await r.json();
+  let bal = parseFloat(d.value)||0;
+  await fetch(`${API}/set?key=balance_${uid}&value=${bal+amt}`);
+}
+
+async function handleReferral(){
+  let existing = await getUser();
+  if(existing) return;
+
+  let ref = getRef();
+
+  await saveUser({id:userId,referrer:ref});
+
+  if(ref && ref != userId){
+    await addBalance(ref, 0.02);
+
+    let r = await fetch(`${API}/get?key=refs_${ref}`);
+    let d = await r.json();
+
+    let count = parseInt(d.value)||0;
+    count++;
+
+    await fetch(`${API}/set?key=refs_${ref}&value=${count}`);
   }
 }
+handleReferral();
 
-function updateVIP(){
-  let vip = localStorage.getItem("vip");
-  document.getElementById("vipStatus").textContent =
-    vip==="yes" ? "💎 VIP User" : "👤 Normal User";
+/* SHOW REF */
+document.getElementById("refLink").value =
+`https://t.me/YOUR_BOT_USERNAME?start=${userId}`;
+
+async function loadRefs(){
+  let r = await fetch(`${API}/get?key=refs_${userId}`);
+  let d = await r.json();
+  document.getElementById("refCount").innerText = d.value||0;
 }
-updateVIP();
+loadRefs();
 
-/* WATCH */
-document.getElementById("watchBtn").onclick=()=>{
-  document.getElementById("videoFeed").style.display="block";
-  loadVideo();
-};
+/* ================= VIDEO ================= */
+const videoFeed = document.getElementById("videoFeed");
+
+videoFeed.innerHTML = `
+<video id="videoPlayer" width="100%" height="250" autoplay muted playsinline></video>
+<p id="timerText">⏳ Watching...</p>
+
+<button class="button" id="likeBtn">👍 Like</button>
+<button class="button" id="skipBtn">⏭ Skip</button>
+
+<p>⭐ Level: <span id="levelText">1</span></p>
+<p>⚡ PV: <span id="pvText">0</span></p>
+<p style="font-size:12px;">1000 PV = $0.1</p>
+
+<button class="button" onclick="convertPV()">💱 Convert PV</button>
+<button class="button" id="dailyBtn">🎁 Daily Bonus</button>
+<button class="button" id="adBtn">🎁 Watch Ad</button>
+`;
+
+let videos=[
+"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
+];
+
+let index=0;
 
 function loadVideo(){
-  document.getElementById("ytPlayer").src=videos[i];
+  let p=document.getElementById("videoPlayer");
+  p.src=videos[index];
+  p.play().catch(()=>{});
   startTimer();
 }
 
 function nextVideo(){
-  i=(i+1)%videos.length;
-  totalWatch++;
-  localStorage.setItem("watchCount", totalWatch);
-
-  checkVIP();
-  updateVIP();
-
+  index=(index+1)%videos.length;
   loadVideo();
-  smartAd();
 }
 
-/* TIMER */
 function startTimer(){
-  watch=0;
+  let watch=0;
+  let player=document.getElementById("videoPlayer");
+
   let t=setInterval(()=>{
+    if(player.paused){
+      clearInterval(t);
+      alert("Don't pause video");
+      return;
+    }
+
     watch++;
-    document.getElementById("timerText").textContent="Watching "+watch+"s";
+    document.getElementById("timerText").innerText="Watching "+watch+"s";
 
     if(watch>=10){
       clearInterval(t);
+      addReward(0.001);
+      addPV(8);
       nextVideo();
     }
   },1000);
 }
 
-/* ADS */
-function canAd(){
-  let now=Date.now();
-  if(now-lastAd<15000) return false;
-  lastAd=now;
-  return true;
-}
-
-function smartAd(){
-  engage++;
-  if(engage%3===0 && canAd()){
-    if(confirm("Watch ad for bonus?")){
-      RewardAd.show().then(r=>{
-        if(r.done) addReward(0.03);
-      });
-    }
-  }
-}
-
-/* VIP TASK SYSTEM */
-const taskBlocks = ["task-27003","task-27004"];
-let taskIndex = 0;
-
-function getTaskConfig(){
-  let vip = localStorage.getItem("vip");
-  return vip==="yes"
-    ? {reward:0.005, limit:10}
-    : {reward:0.002, limit:5};
-}
-
-let taskData = JSON.parse(localStorage.getItem("taskData")) || {
-  date:new Date().toDateString(),
-  completed:0
+/* BUTTONS */
+document.getElementById("watchBtn").onclick=()=>{
+  videoFeed.style.display="block";
+  loadVideo();
 };
 
-function resetTasks(){
+document.getElementById("likeBtn").onclick=()=>addPV(3);
+document.getElementById("skipBtn").onclick=()=>nextVideo();
+
+/* DAILY */
+document.getElementById("dailyBtn").onclick=()=>{
+  let last=localStorage.getItem("daily");
   let today=new Date().toDateString();
-  if(taskData.date!==today){
-    taskData={date:today,completed:0};
-    localStorage.setItem("taskData",JSON.stringify(taskData));
-  }
-}
 
-function loadTask(id){
-  let cfg = getTaskConfig();
+  if(last===today) return alert("Already claimed");
 
-  if(taskData.completed >= cfg.limit){
-    document.getElementById("taskLimit").textContent =
-      "⏳ Daily limit reached";
-    document.getElementById("taskLimit").style.display="block";
-    return;
-  }
+  localStorage.setItem("daily",today);
+  addReward(0.01);
+  addPV(20);
+};
 
-  document.getElementById("taskLimit").style.display="none";
+/* ADS */
+document.getElementById("adBtn").onclick=()=>{
+  window.Adsgram.init({blockId:"27001"}).show();
+};
+
+/* ================= TASK ================= */
+document.getElementById("taskBtn").onclick=()=>{
+  document.getElementById("taskSection").style.display="block";
 
   let t=document.createElement("adsgram-task");
-  t.setAttribute("data-block-id",id);
+  t.setAttribute("data-block-id","task-22205");
   t.id="currentTask";
 
   document.getElementById("currentTask").replaceWith(t);
 
-  t.addEventListener("reward",()=>handleTask());
-}
-
-let lastTask=0;
-
-function handleTask(){
-  let now=Date.now();
-  if(now-lastTask<10000) return alert("Wait...");
-
-  lastTask=now;
-
-  let cfg = getTaskConfig();
-
-  addReward(cfg.reward);
-
-  taskData.completed++;
-  localStorage.setItem("taskData",JSON.stringify(taskData));
-
-  document.getElementById("taskMsg").textContent =
-    "✅ Earned $" + cfg.reward;
-  document.getElementById("taskMsg").style.display="block";
-
-  setTimeout(()=>{document.getElementById("taskMsg").style.display="none";},3000);
-
-  taskIndex=(taskIndex+1)%taskBlocks.length;
-  loadTask(taskBlocks[taskIndex]);
-}
-
-document.getElementById("taskBtn").onclick=()=>{
-  document.getElementById("taskSection").style.display="block";
-  resetTasks();
-  loadTask(taskBlocks[taskIndex]);
+  t.addEventListener("reward",()=>{
+    addReward(0.002);
+    document.getElementById("taskMsg").innerText="Done";
+    document.getElementById("taskMsg").style.display="block";
+  });
 };
 
-/* WALLET */
+/* ================= WALLET ================= */
 document.getElementById("walletBtn").onclick=()=>{
   document.getElementById("walletSection").style.display="block";
 };
@@ -285,7 +377,7 @@ document.getElementById("withdrawBtn").onclick=async()=>{
     amount:amt
   }));
 
-  alert("Sent");
+  alert("Request sent");
   updateUI();
 };
 </script>
