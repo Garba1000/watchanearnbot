@@ -36,12 +36,17 @@ body { font-family: Arial; text-align:center; background:#f5f5f5; }
 <body>
 
 <h2>🎥 Watch & Earn</h2>
-<p>Balance: $<span id="walletBalance">0.000</span></p>
+<p>💰 Balance: $<span id="walletBalance">0.000</span></p>
 
 <button class="button" id="watchBtn">🎬 Watch Video</button>
 <button class="button" id="watchAdBtn">🎁 Watch Ad (Optional)</button>
 <button class="button" id="taskBtn">✅ Tasks</button>
 <button class="button" id="walletBtn">👛 Wallet</button>
+
+<!-- PV DISPLAY -->
+<p>⚡ PV Balance: <span id="pvText">0</span></p>
+
+<button class="button" onclick="convertPV()">💱 Convert PV</button>
 
 <!-- TASK -->
 <div id="taskSection" style="display:none;">
@@ -66,14 +71,14 @@ body { font-family: Arial; text-align:center; background:#f5f5f5; }
   <button class="button" id="withdrawBtn">Withdraw</button>
 </div>
 
-<!-- REFERRAL -->
+<!-- REF -->
 <div>
   <h3>👥 Referral</h3>
   <input id="refLink" class="button" readonly>
   <p>Total referrals: <span id="refCount">0</span></p>
 </div>
 
-<!-- VIDEO MODAL -->
+<!-- VIDEO -->
 <div id="videoModal">
   <iframe id="ytFrame"
   width="100%" height="100%"
@@ -126,69 +131,81 @@ async function updateUI(){
 }
 updateUI();
 
-/* ================= VIDEO SYSTEM ================= */
-let videos = [
-  "Duuv56SJA5w"
-];
+/* ================= PV SYSTEM ================= */
+let pv = parseInt(localStorage.getItem("pv")) || 0;
 
+function addPV(a){
+  pv += a;
+  localStorage.setItem("pv", pv);
+  updatePV();
+}
+
+function updatePV(){
+  document.getElementById("pvText").innerText = pv;
+}
+
+/* ================= VIDEO SYSTEM ================= */
 let watchStart = 0;
 let rewarded = false;
+let active = false;
 
 function openVideo(){
-  let id = videos[Math.floor(Math.random() * videos.length)];
+  let id = "Duuv56SJA5w";
 
   document.getElementById("videoModal").style.display = "block";
   document.getElementById("ytFrame").src =
     "https://www.youtube.com/embed/" + id + "?autoplay=1&mute=1";
 
-  startVideoTimer();
+  watchStart = Date.now();
+  rewarded = false;
+  active = true;
+
+  startTimer();
 }
 
-function startVideoTimer(){
-  rewarded = false;
-  watchStart = Date.now();
-
+function startTimer(){
   let t = setInterval(()=>{
+    if(!active){
+      clearInterval(t);
+      return;
+    }
+
     let watchTime = (Date.now() - watchStart)/1000;
 
-    if(watchTime >= 30 && !rewarded){
+    if(watchTime >= 60 && !rewarded){
       rewarded = true;
 
-      addReward(0.001);
-      addPV(10);
-
+      addPV(10); // 🎯 reward
       clearInterval(t);
     }
   },1000);
 }
 
 function closeVideo(){
+  active = false;
   document.getElementById("videoModal").style.display = "none";
   document.getElementById("ytFrame").src = "";
 }
 
-/* ================= PV SYSTEM ================= */
-let pv = parseInt(localStorage.getItem("pv"))||0;
-let level = parseInt(localStorage.getItem("level"))||1;
-
-function addPV(a){
-  pv += a;
-
-  if(pv >= level*50){
-    pv = 0;
-    level++;
+/* ================= CONVERT PV ================= */
+function convertPV(){
+  if(pv < 1000){
+    alert("Need 1000 PV");
+    return;
   }
 
-  localStorage.setItem("pv",pv);
-  localStorage.setItem("level",level);
+  let dollars = (pv / 1000) * 0.03;
+
+  pv = 0;
+  localStorage.setItem("pv", 0);
+  updatePV();
+
+  addReward(dollars);
+
+  alert("Converted $" + dollars.toFixed(3));
 }
 
-/* ================= BUTTONS ================= */
-document.getElementById("watchBtn").onclick = ()=>{
-  openVideo();
-};
-
-/* ================= ADSGRAM AD (OPTIONAL) ================= */
+/* ================= ADSGRAM AD ================= */
 document.getElementById("watchAdBtn").onclick = ()=>{
   let ad = window.Adsgram.init({blockId:"27001"});
 
@@ -200,7 +217,11 @@ document.getElementById("watchAdBtn").onclick = ()=>{
   });
 };
 
-/* ================= TASK ================= */
+/* ================= BUTTONS ================= */
+document.getElementById("watchBtn").onclick = ()=>{
+  openVideo();
+};
+
 document.getElementById("taskBtn").onclick=()=>{
   document.getElementById("taskSection").style.display="block";
 
@@ -218,7 +239,6 @@ document.getElementById("taskBtn").onclick=()=>{
   });
 };
 
-/* ================= WALLET ================= */
 document.getElementById("walletBtn").onclick=()=>{
   document.getElementById("walletSection").style.display="block";
 };
@@ -242,7 +262,7 @@ document.getElementById("withdrawBtn").onclick=async()=>{
   updateUI();
 };
 
-/* ================= REF ================= */
+/* REF */
 document.getElementById("refLink").value =
 `https://t.me/YOUR_BOT_USERNAME?start=${userId}`;
 
