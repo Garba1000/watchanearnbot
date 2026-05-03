@@ -207,7 +207,7 @@ function convertPV(){
 
 /* ================= ADSGRAM AD ================= */
 document.getElementById("watchAdBtn").onclick = ()=>{
-  let ad = window.Adsgram.init({blockId:"27001"});
+  let ad = window.Adsgram.init({blockId:"29339"});
 
   ad.show().then(res=>{
     if(res && res.done){
@@ -226,7 +226,7 @@ document.getElementById("taskBtn").onclick=()=>{
   document.getElementById("taskSection").style.display="block";
 
   let t=document.createElement("adsgram-task");
-  t.setAttribute("data-block-id","task-22205");
+  t.setAttribute("data-block-id","task-29340");
   t.id="currentTask";
 
   document.getElementById("currentTask").replaceWith(t);
